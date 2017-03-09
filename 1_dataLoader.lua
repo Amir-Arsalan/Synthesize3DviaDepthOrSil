@@ -35,11 +35,6 @@ Note: All zip files must have the format described above
 
 --]]
 
---[[
-TODO:
-ModelNet40 experiment
---]]
-
 
 ----------------------------------------------------------------------
 print '==> Data read processing options'

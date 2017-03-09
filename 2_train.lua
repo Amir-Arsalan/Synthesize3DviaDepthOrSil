@@ -3,11 +3,6 @@
 
 --[[
 TODO: Describe the data structure saved on disk
-
-Words to be careful with:
-lowerbound = totalErr
-inputs = depthMaps
-opt.lr
 --]]
 
 
