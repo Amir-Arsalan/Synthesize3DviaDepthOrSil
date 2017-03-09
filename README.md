@@ -4,28 +4,28 @@
 This Readme file is to be completely modified.
 
 How to process the data and start training:
-Your raw data should be in .zip files
-Create one .zip file for each object category (e.g. chair.zip, sofa.zip etc)
-Copy your .zip files to /Data/[benchmark/nonbenchmark]
-Each zip file MUST contain either (or both) of the following directories:
-	- catName_depth_float
-	- catName_depth_rgb
-"catName" is the class label. E.g. "sofa", "chair, night_stand" etc
-Each directory contains files with patterns as follow: (%a+_%d+_%a+_%d*.[png/txt]). E.g. model_000043_Cam_0.[png/txt]. In our experiments we have 20 view points so the file names for each 3D model have Cam_0 to Cam_19 in their names.
-The option opt.rawDataType determines whether to process the .txt (float) or png (int) files. Set opt.rawDataType to 'float' and 'int' to read .txt or .png files respectively
+* Your raw data should be in .zip files
+* Create one .zip file for each object category (e.g. chair.zip, sofa.zip etc)
+* Copy your .zip files to /Data/[benchmark/nonbenchmark]
+* Each zip file MUST contain either (or both) of the following directories:
+* 	- catName_depth_float
+*	- catName_depth_rgb
+* "catName" is the class label. E.g. "sofa", "chair, night_stand" etc
+* Each directory contains files with patterns as follow: (%a+_%d+_%a+_%d*.[png/txt]). E.g. model_000043_Cam_0.[png/txt]. In our experiments we have 20 view points so the file names for each 3D model have Cam_0 to Cam_19 in their names.
+* The option opt.rawDataType determines whether to process the .txt (float) or png (int) files. Set opt.rawDataType to 'float' and 'int' to read .txt or .png files respectively
 
 
 Before proceeding, create a directory named "Data" in the cloned repository's directory
-How to process nonbenchmark data:
-If you are working with your own data set then create the directory /Data/nonbenchmark
-Copy your .zip files in "Data/nonbenchmark"
-Set opt.benchmark = 0
+* How to process nonbenchmark data:
+* If you are working with your own data set then create the directory /Data/nonbenchmark
+* Copy your .zip files in "Data/nonbenchmark"
+* Set opt.benchmark = 0
 
 How to process benchmark data (ModelNet40):
-If you are working with some benchmark data set then create the directory /Data/benchmark
-Create two directories "/Data/benchmark/train" and "/Data/benchmark/test"
-Copy your train and test .zip files in the corresponding directories
-Set opt.benchmark = 1
+* If you are working with some benchmark data set then create the directory /Data/benchmark
+* Create two directories "/Data/benchmark/train" and "/Data/benchmark/test"
+* Copy your train and test .zip files in the corresponding directories
+* Set opt.benchmark = 1
 
 Note: All zip files must have the format described above
 
