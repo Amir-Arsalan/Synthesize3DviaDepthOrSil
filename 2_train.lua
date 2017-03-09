@@ -706,7 +706,7 @@ if trainDataFiles then -- If there are training files on disk
         end
 
         -- Sample the manifold
-        if continueTraining and epoch >= 42 then
+        if continueTraining and epoch >= 12 then
             print ('==> Doing sampling/interpolation with the model. Configs: Type -- ' .. opt.sampleType .. ', Number of Samples: ' .. opt.nSamples .. ', Canvas Size: ' .. opt.canvasHW .. ' x ' .. opt.canvasHW .. ', Mean: ' .. opt.mean .. ', Variance: ' .. opt.var)
             local samplesPath = string.format(paths.cwd() .. '/%s/images-Latents_%d-BS_%d-Ch_%d-lr_%.5f/epoch%d/manifold',opt.expDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr, epoch)
             sampleManifold.sample(opt.sampleType, opt.sampleCategory, opt.canvasHW, opt.nSamples, data, modelTest, '', samplesPath, opt.mean, opt.var, opt.nLatents, opt.imgSize, opt.numVPs, epoch, opt.batchSize, opt.targetBatchSize, false, opt.testPhase, opt.tanh, opt.dropoutNet, opt.VpToKeep, opt.onlySilhouettes, sampleZembeddings, opt.singleVPNet, opt.conditional, nil, opt.benchmark)
