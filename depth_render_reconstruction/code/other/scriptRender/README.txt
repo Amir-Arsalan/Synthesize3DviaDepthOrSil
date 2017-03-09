@@ -1,0 +1,1 @@
+put all obj files together with those files, and then double click runRendering.bat
