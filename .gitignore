@@ -1,0 +1,8 @@
+/Data
+/ExtraData
+/save
+/images
+*.png
+*.zip
+*.lua~
+*.t7
