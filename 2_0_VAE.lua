@@ -20,7 +20,7 @@ end
 
 
 -- Residual network functions
--- https://github.com/facebook/fb.resnet.torch
+-- The original ResNet functions were obtained from https://github.com/facebook/fb.resnet.torch and then modified
 
 -- Typically shareGradInput uses the same gradInput storage for all modules
 -- of the same type. This is incorrect for some SpatialBatchNormalization

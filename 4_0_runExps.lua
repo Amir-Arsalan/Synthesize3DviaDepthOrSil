@@ -54,13 +54,13 @@ if opt.expType == 'random' then
 		data = torch.load(trainDataFiles[1])
 	end
 	local sampleZembeddings = torch.load(meanLogVarPath)
-	sampleManifold.sample(opt.sampleType, opt.sampleCategory, opt.canvasHW, opt.nSamples, data, gMod:get(1), '', storagePath, opt.mean, opt.var, opt.nLatents, opt.gpu, 224, opt.numVPs, opt.fromEpoch, opt.batchSize, opt.targetBatchSize, false, opt.VPsTogether, opt.mixVPs, opt.testPhase, opt.loss, opt.modelType, opt.tanh, opt.dropVPs, opt.notDropVP, opt.silhouettes, opt.onlySilhouettes, true, sampleZembeddings, opt.unknownVPs, opt.conditional, opt.expType)
+	sampleManifold.sample(opt.sampleType, opt.sampleCategory, opt.canvasHW, opt.nSamples, data, gMod:get(1), '', storagePath, opt.mean, opt.var, opt.nLatents, opt.gpu, 224, opt.numVPs, opt.fromEpoch, false, opt.VPsTogether, opt.mixVPs, opt.testPhase, opt.loss, opt.modelType, opt.tanh, opt.dropVPs, opt.notDropVP, opt.silhouettes, opt.onlySilhouettes, true, sampleZembeddings, opt.unknownVPs, opt.conditional, opt.expType)
 
 elseif opt.expType == 'interpolate' then
 	print ("==> Doing interpolation")
 	print ("==> Configurations - Loss: " .. opt.lossText .. ", expDirName: " .. opt.expDirName .. ", No. Latents: " .. opt.nLatents .. ", Batch Size: " .. opt.batchSize .. ", Batch Size Change Epoch: " .. opt.batchSizeChangeEpoch .. ", Batch Size Change: " .. opt.batchSizeChange .. ", Target Batch Size: " .. opt.targetBatchSize .. ", No. Output Channels: " .. opt.nCh .. ", LR Decay: " .. opt.lrDecay .. ", Learning Rate: " .. opt.lr .. ", InitialLR: " .. opt.initialLR .. ", Network Type: " .. opt.modelType .. ", Tanh: " .. (opt.tanh and "True" or "False") .. ', dropVPs: ' .. (opt.dropVPs and "True" or "False") .. ', notDropVP: ' .. opt.notDropVP .. ', silhouettes: ' .. (opt.silhouettes and "True" or "False") .. ', onlySilhouettes: ' .. (opt.onlySilhouettes and "True" or "False") .. ', unknownVPs: ' .. (opt.unknownVPs and "True" or "False") .. ', conditional: ' .. (opt.conditional and "True" or "False"))
 	data = torch.load(trainDataFiles[1])
-	sampleManifold.sample(opt.sampleType, opt.sampleCategory, opt.canvasHW, opt.nSamples, data, gMod:get(1), '', storagePath, opt.mean, opt.var, opt.nLatents, opt.gpu, 224, opt.numVPs, opt.fromEpoch, opt.batchSize, opt.targetBatchSize, false, opt.VPsTogether, opt.mixVPs, opt.testPhase, opt.loss, opt.modelType, opt.tanh, opt.dropVPs, opt.notDropVP, opt.silhouettes, opt.onlySilhouettes, true, sampleZembeddings, opt.unknownVPs, opt.conditional, opt.expType)
+	sampleManifold.sample(opt.sampleType, opt.sampleCategory, opt.canvasHW, opt.nSamples, data, gMod:get(1), '', storagePath, opt.mean, opt.var, opt.nLatents, opt.gpu, 224, opt.numVPs, opt.fromEpoch, false, opt.VPsTogether, opt.mixVPs, opt.testPhase, opt.loss, opt.modelType, opt.tanh, opt.dropVPs, opt.notDropVP, opt.silhouettes, opt.onlySilhouettes, true, sampleZembeddings, opt.unknownVPs, opt.conditional, opt.expType)
 
 elseif opt.expType == 'forwardPass' then
 	print ("==> Doing forward pass for the '" .. opt.forwardPassType .. "' experiment")

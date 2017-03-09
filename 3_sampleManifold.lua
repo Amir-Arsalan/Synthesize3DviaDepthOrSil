@@ -9,7 +9,7 @@ local commonFuncs = require '0_commonFuncs'
 
 local sampleManifold = {}
 
-function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, data, model, modelPath, samplesPath, mean, var, nLatents, imgSize, numVPs, epoch, batchSize, targetBatchSize, sampleOnly, testPhase, tanh, dropoutNet, VpToKeep, onlySilhouettes, sampleZembeddings, singleVPNet, conditional, expType, benchmark)
+function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, data, model, modelPath, samplesPath, mean, var, nLatents, imgSize, numVPs, epoch, sampleOnly, testPhase, tanh, dropoutNet, VpToKeep, onlySilhouettes, sampleZembeddings, singleVPNet, conditional, expType, benchmark)
     local conditionalAvailable = conditional and 1 or 0
     if sampleOnly and modelPath ~= '' then
         require 'nngraph'
@@ -174,12 +174,12 @@ function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, d
                         local matchingElements = data.labels:eq(torch.Tensor(data.dataset:size(1)):fill(class)) -- Find the samples within one of the classes
                         if matchingElements:sum() > 1 then
                             local tempData = data.dataset:index(1, torch.range(1, data.dataset:size(1))[matchingElements]:long()):clone() -- Extract the samples belonging to the class of interest
-                            local batchIndices = torch.randperm(tempData:size(1)):long():split(math.max(math.ceil(batchSize/2), targetBatchSize))
+                            local batchIndices = torch.randperm(tempData:size(1)):long():split(2)
 
                             -- Correct the last index set size
                             if #batchIndices > 1 then
                                 local tempbatchIndices = {}
-                                for ll=1, tempData:size(1) - math.max(math.ceil(batchSize/2), targetBatchSize) * (#batchIndices - 1) do
+                                for ll=1, tempData:size(1) - 2 * (#batchIndices - 1) do
                                     tempbatchIndices[ll] = batchIndices[#batchIndices][ll]
                                 end
                                 batchIndices[#batchIndices] = torch.LongTensor(tempbatchIndices)
@@ -226,7 +226,11 @@ function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, d
                                             model:forward(not opt.onlySilhouettes and droppedInputs[1] or droppedInputs[2])
                                         end
                                     else
+                                        print (depthMaps:size())
+                                        print (silhouettes:size())
                                         droppedInputs = commonFuncs.dropInputVPs(not onlySilhouettes and depthMaps or silhouettes, nil, true, numOfVPsToDrop, dropIndices, singleVPNet, pickedVPs)
+                                        print (droppedInputs:size())
+                                        os.exit()
                                         if opt.conditional then
                                             mean, log_var, predictedClassScores = unpack(model:get(2):forward(droppedInputs))
                                             predClassVec = commonFuncs.computeClassificationAccuracy(predictedClassScores, nil, true, #data.category)

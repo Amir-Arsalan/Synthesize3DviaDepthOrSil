@@ -40,7 +40,7 @@ cmd:option('-nCh', 64, "A multiplier to control the number of feature maps for e
 cmd:option('-nLatents', 225, 'Determines the number of latent variables: Any positive real number')
 cmd:option('-tanh', 0, "Set to 1 if you want to normalize the input/output values to be between -1 and 1 instead of 0 to 1")
 -- Training:
-cmd:option('-batchSize', 100, 'Batch size for training (SGD): any integer number (1 or higher)')
+cmd:option('-batchSize', 4, 'Batch size for training')
 cmd:option('-batchSizeChangeEpoch', 15, 'Change the batch size every opt.batchSizeChangeEpoch epochs: any integer number (1 or higher)')
 cmd:option('-batchSizeChange', 5, 'The number to be subtracted/added every opt.batchSizeChangeEpoch from opt.batchSize: any integer number (1 or higher)')
 cmd:option('-targetBatchSize', 25, 'The minimum batch size for training (SGD): any integer number (2 or higher)')
