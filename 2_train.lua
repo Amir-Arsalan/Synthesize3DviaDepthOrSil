@@ -706,7 +706,11 @@ if trainDataFiles then -- If there are training files on disk
         end
 
         -- Sample the manifold
+<<<<<<< HEAD
         if continueTraining and epoch >= 14 and epoch % 2 == 0 then
+=======
+        if continueTraining and epoch >= 14 and epoch %2 == 0 then
+>>>>>>> 21b53826c8a3db01b410da4c0b04eca10f028ba9
             print ('==> Doing sampling/interpolation with the model. Configs: Type -- ' .. opt.sampleType .. ', Number of Samples: ' .. opt.nSamples .. ', Canvas Size: ' .. opt.canvasHW .. ' x ' .. opt.canvasHW .. ', Mean: ' .. opt.mean .. ', Variance: ' .. opt.var)
             local samplesPath = string.format(paths.cwd() .. '/%s/images-Latents_%d-BS_%d-Ch_%d-lr_%.5f/epoch%d/manifold',opt.expDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr, epoch)
             sampleManifold.sample(opt.sampleType, opt.sampleCategory, opt.canvasHW, opt.nSamples, data, modelTest, '', samplesPath, opt.mean, opt.var, opt.nLatents, opt.imgSize, opt.numVPs, epoch, false, opt.testPhase, opt.tanh, opt.dropoutNet, opt.VpToKeep, opt.onlySilhouettes, sampleZembeddings, opt.singleVPNet, opt.conditional, nil, opt.benchmark)

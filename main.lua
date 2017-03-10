@@ -124,7 +124,7 @@ elseif opt.sampleOnly then
 	local handle = assert(io.popen(string.format('mkdir -p %s/images-Latents_%d-BS_%d-Ch_%d-lr_%.5f/samples', opt.expDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr)))
 	handle:close()
     local samplesPath = string.format(paths.cwd() .. '/%s/images-%s-Latents_%d-BS_%d-Ch_%d-lr_%.5f-CNN_%s/samples',opt.expDirName, opt.lossText, opt.nLatents, opt.batchSize, opt.nCh, opt.lr, opt.decoderType)
-	sampleManifold.sample(opt.sampleType, opt.sampleCategory, opt.canvasHW, opt.nSamples, '', model, opt.modelPath, samplesPath, opt.mean, opt.var, opt.nLatents, opt.gpu, opt.imgSize, opt.numVPs, 0, opt.batchSize, opt.targetBatchSize, opt.sampleOnly, opt.VPsTogether, opt.mixVPs, opt.testPhase, opt.loss, opt.modelType, opt.tanh)
+	sampleManifold.sample(opt.sampleType, opt.sampleCategory, opt.canvasHW, opt.nSamples, '', model, opt.modelPath, samplesPath, opt.mean, opt.var, opt.nLatents, opt.gpu, opt.imgSize, opt.numVPs, 0, opt.sampleOnly, opt.VPsTogether, opt.mixVPs, opt.testPhase, opt.loss, opt.modelType, opt.tanh)
 elseif opt.experiment then
 	dofile('4_0_runExps.lua')
 end
