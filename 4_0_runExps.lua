@@ -49,22 +49,22 @@ print ''
 
 if opt.expType == 'random' then
 	print ("==> Generating random samples")
-	print ("==> Configurations - Loss: " .. opt.lossText .. ", expDirName: " .. opt.expDirName .. ", No. Latents: " .. opt.nLatents .. ", Batch Size: " .. opt.batchSize .. ", Batch Size Change Epoch: " .. opt.batchSizeChangeEpoch .. ", Batch Size Change: " .. opt.batchSizeChange .. ", Target Batch Size: " .. opt.targetBatchSize .. ", No. Output Channels: " .. opt.nCh .. ", LR Decay: " .. opt.lrDecay .. ", Learning Rate: " .. opt.lr .. ", InitialLR: " .. opt.initialLR .. ", Network Type: " .. opt.modelType .. ", Tanh: " .. (opt.tanh and "True" or "False") .. ', dropVPs: ' .. (opt.dropVPs and "True" or "False") .. ', notDropVP: ' .. opt.notDropVP .. ', silhouettes: ' .. (opt.silhouettes and "True" or "False") .. ', onlySilhouettes: ' .. (opt.onlySilhouettes and "True" or "False") .. ', unknownVPs: ' .. (opt.unknownVPs and "True" or "False") .. ', conditional: ' .. (opt.conditional and "True" or "False"))
+	print ("==> Configurations - Loss: " .. opt.lossText .. ", expDirName: " .. opt.expDirName .. ", No. Latents: " .. opt.nLatents .. ", Batch Size: " .. opt.batchSize .. ", Batch Size Change Epoch: " .. opt.batchSizeChangeEpoch .. ", Batch Size Change: " .. opt.batchSizeChange .. ", Target Batch Size: " .. opt.targetBatchSize .. ", No. Output Channels: " .. opt.nCh .. ", LR Decay: " .. opt.lrDecay .. ", Learning Rate: " .. opt.lr .. ", InitialLR: " .. opt.initialLR .. ", Network Type: " .. opt.modelType .. ", Tanh: " .. (opt.tanh and "True" or "False") .. ', dropVPs: ' .. (opt.dropVPs and "True" or "False") .. ', notDropVP: ' .. opt.notDropVP .. ', silhouettes: ' .. (opt.silhouettes and "True" or "False") .. ', onlySilhouettes: ' .. (opt.onlySilhouettes and "True" or "False") .. ', singleVPNet: ' .. (opt.singleVPNet and "True" or "False") .. ', conditional: ' .. (opt.conditional and "True" or "False"))
 	if opt.conditional then
 		data = torch.load(trainDataFiles[1])
 	end
 	local sampleZembeddings = torch.load(meanLogVarPath)
-	sampleManifold.sample(opt.sampleType, opt.sampleCategory, opt.canvasHW, opt.nSamples, data, gMod:get(1), '', storagePath, opt.mean, opt.var, opt.nLatents, opt.gpu, 224, opt.numVPs, opt.fromEpoch, false, opt.VPsTogether, opt.mixVPs, opt.testPhase, opt.loss, opt.modelType, opt.tanh, opt.dropVPs, opt.notDropVP, opt.silhouettes, opt.onlySilhouettes, true, sampleZembeddings, opt.unknownVPs, opt.conditional, opt.expType)
+	sampleManifold.sample(opt.sampleType, opt.sampleCategory, opt.canvasHW, opt.nSamples, data, gMod:get(1), '', storagePath, opt.mean, opt.var, opt.nLatents, opt.gpu, 224, opt.numVPs, opt.fromEpoch, false, opt.VPsTogether, opt.mixVPs, opt.testPhase, opt.loss, opt.modelType, opt.tanh, opt.dropVPs, opt.notDropVP, opt.silhouettes, opt.onlySilhouettes, true, sampleZembeddings, opt.singleVPNet, opt.conditional, opt.expType)
 
 elseif opt.expType == 'interpolate' then
 	print ("==> Doing interpolation")
-	print ("==> Configurations - Loss: " .. opt.lossText .. ", expDirName: " .. opt.expDirName .. ", No. Latents: " .. opt.nLatents .. ", Batch Size: " .. opt.batchSize .. ", Batch Size Change Epoch: " .. opt.batchSizeChangeEpoch .. ", Batch Size Change: " .. opt.batchSizeChange .. ", Target Batch Size: " .. opt.targetBatchSize .. ", No. Output Channels: " .. opt.nCh .. ", LR Decay: " .. opt.lrDecay .. ", Learning Rate: " .. opt.lr .. ", InitialLR: " .. opt.initialLR .. ", Network Type: " .. opt.modelType .. ", Tanh: " .. (opt.tanh and "True" or "False") .. ', dropVPs: ' .. (opt.dropVPs and "True" or "False") .. ', notDropVP: ' .. opt.notDropVP .. ', silhouettes: ' .. (opt.silhouettes and "True" or "False") .. ', onlySilhouettes: ' .. (opt.onlySilhouettes and "True" or "False") .. ', unknownVPs: ' .. (opt.unknownVPs and "True" or "False") .. ', conditional: ' .. (opt.conditional and "True" or "False"))
+	print ("==> Configurations - Loss: " .. opt.lossText .. ", expDirName: " .. opt.expDirName .. ", No. Latents: " .. opt.nLatents .. ", Batch Size: " .. opt.batchSize .. ", Batch Size Change Epoch: " .. opt.batchSizeChangeEpoch .. ", Batch Size Change: " .. opt.batchSizeChange .. ", Target Batch Size: " .. opt.targetBatchSize .. ", No. Output Channels: " .. opt.nCh .. ", LR Decay: " .. opt.lrDecay .. ", Learning Rate: " .. opt.lr .. ", InitialLR: " .. opt.initialLR .. ", Network Type: " .. opt.modelType .. ", Tanh: " .. (opt.tanh and "True" or "False") .. ', dropVPs: ' .. (opt.dropVPs and "True" or "False") .. ', notDropVP: ' .. opt.notDropVP .. ', silhouettes: ' .. (opt.silhouettes and "True" or "False") .. ', onlySilhouettes: ' .. (opt.onlySilhouettes and "True" or "False") .. ', singleVPNet: ' .. (opt.singleVPNet and "True" or "False") .. ', conditional: ' .. (opt.conditional and "True" or "False"))
 	data = torch.load(trainDataFiles[1])
-	sampleManifold.sample(opt.sampleType, opt.sampleCategory, opt.canvasHW, opt.nSamples, data, gMod:get(1), '', storagePath, opt.mean, opt.var, opt.nLatents, opt.gpu, 224, opt.numVPs, opt.fromEpoch, false, opt.VPsTogether, opt.mixVPs, opt.testPhase, opt.loss, opt.modelType, opt.tanh, opt.dropVPs, opt.notDropVP, opt.silhouettes, opt.onlySilhouettes, true, sampleZembeddings, opt.unknownVPs, opt.conditional, opt.expType)
+	sampleManifold.sample(opt.sampleType, opt.sampleCategory, opt.canvasHW, opt.nSamples, data, gMod:get(1), '', storagePath, opt.mean, opt.var, opt.nLatents, opt.gpu, 224, opt.numVPs, opt.fromEpoch, false, opt.VPsTogether, opt.mixVPs, opt.testPhase, opt.loss, opt.modelType, opt.tanh, opt.dropVPs, opt.notDropVP, opt.silhouettes, opt.onlySilhouettes, true, sampleZembeddings, opt.singleVPNet, opt.conditional, opt.expType)
 
 elseif opt.expType == 'forwardPass' then
 	print ("==> Doing forward pass for the '" .. opt.forwardPassType .. "' experiment")
-	print ("==> Configurations - Loss: " .. opt.lossText .. ", expDirName: " .. opt.expDirName .. ", No. Latents: " .. opt.nLatents .. ", Batch Size: " .. opt.batchSize .. ", Batch Size Change Epoch: " .. opt.batchSizeChangeEpoch .. ", Batch Size Change: " .. opt.batchSizeChange .. ", Target Batch Size: " .. opt.targetBatchSize .. ", No. Output Channels: " .. opt.nCh .. ", LR Decay: " .. opt.lrDecay .. ", Learning Rate: " .. opt.lr .. ", InitialLR: " .. opt.initialLR .. ", Network Type: " .. opt.modelType .. ", Tanh: " .. (opt.tanh and "True" or "False") .. ', dropVPs: ' .. (opt.dropVPs and "True" or "False") .. ', notDropVP: ' .. opt.notDropVP .. ', silhouettes: ' .. (opt.silhouettes and "True" or "False") .. ', onlySilhouettes: ' .. (opt.onlySilhouettes and "True" or "False") .. ', unknownVPs: ' .. (opt.unknownVPs and "True" or "False") .. ', conditional: ' .. (opt.conditional and "True" or "False"))
+	print ("==> Configurations - Loss: " .. opt.lossText .. ", expDirName: " .. opt.expDirName .. ", No. Latents: " .. opt.nLatents .. ", Batch Size: " .. opt.batchSize .. ", Batch Size Change Epoch: " .. opt.batchSizeChangeEpoch .. ", Batch Size Change: " .. opt.batchSizeChange .. ", Target Batch Size: " .. opt.targetBatchSize .. ", No. Output Channels: " .. opt.nCh .. ", LR Decay: " .. opt.lrDecay .. ", Learning Rate: " .. opt.lr .. ", InitialLR: " .. opt.initialLR .. ", Network Type: " .. opt.modelType .. ", Tanh: " .. (opt.tanh and "True" or "False") .. ', dropVPs: ' .. (opt.dropVPs and "True" or "False") .. ', notDropVP: ' .. opt.notDropVP .. ', silhouettes: ' .. (opt.silhouettes and "True" or "False") .. ', onlySilhouettes: ' .. (opt.onlySilhouettes and "True" or "False") .. ', singleVPNet: ' .. (opt.singleVPNet and "True" or "False") .. ', conditional: ' .. (opt.conditional and "True" or "False"))
 
 	if opt.forwardPassType == 'silhouettes' then
 		storagePath = storagePath .. '/silhouettes'
@@ -190,7 +190,7 @@ elseif opt.expType == 'forwardPass' then
 		for i=1, opt.nReconstructions do catLabels[i] = data.category[labels[i]] end
 
 
-		droppedInputs = commonFuncs.dropInputVPs(inputs, opt.dropVPs and opt.notDropVP or nil, true, nil, nil, opt.unknownVPs, nil, targetClassHotVec)
+		droppedInputs = commonFuncs.dropInputVPs(inputs, opt.dropVPs and opt.notDropVP or nil, true, nil, nil, opt.singleVPNet, nil, targetClassHotVec)
 		if opt.onlySilhouettes then droppedInputs = droppedInputs[2] end
 
 		for i=1, opt.nReconstructions do
@@ -245,7 +245,7 @@ elseif opt.expType == 'forwardPass' then
 			end
 			local label = data.labels[indicesToChoose[i]]
 			local catLabel = data.category[label]
-			droppedInputs = commonFuncs.dropInputVPs(input, opt.dropVPs and opt.notDropVP or nil, true, nil, nil, opt.unknownVPs, nil)
+			droppedInputs = commonFuncs.dropInputVPs(input, opt.dropVPs and opt.notDropVP or nil, true, nil, nil, opt.singleVPNet, nil)
 			if opt.onlySilhouettes then droppedInputs = droppedInputs[2] end
 
 			local networkInput
@@ -294,7 +294,7 @@ elseif opt.expType == 'forwardPass' then
 				-- if opt.onlySilhouettes or opt.silhouettes then
 				-- 	input = {input, maskInput}
 				-- end
-				droppedInputs = commonFuncs.dropInputVPs(not opt.onlySilhouettes and input or maskInput, opt.dropVPs and opt.notDropVP or nil, false, nil, nil, opt.unknownVPs, nil)
+				droppedInputs = commonFuncs.dropInputVPs(not opt.onlySilhouettes and input or maskInput, opt.dropVPs and opt.notDropVP or nil, false, nil, nil, opt.singleVPNet, nil)
 				input = {input[{{1}}], maskInput[{{1}}]}
 				-- if opt.onlySilhouettes then droppedInputs = droppedInputs[2] end
 
@@ -335,7 +335,7 @@ elseif opt.expType == 'forwardPass' then
 			-- if opt.onlySilhouettes or opt.silhouettes then
 			-- 	input = {input, maskInput}
 			-- end
-			droppedInputs = commonFuncs.dropInputVPs(not opt.onlySilhouettes and input or maskInput, opt.dropVPs and opt.notDropVP or nil, false, nil, nil, opt.unknownVPs, nil)
+			droppedInputs = commonFuncs.dropInputVPs(not opt.onlySilhouettes and input or maskInput, opt.dropVPs and opt.notDropVP or nil, false, nil, nil, opt.singleVPNet, nil)
 			input = {input[{{1}}], maskInput[{{1}}]}
 			-- if opt.onlySilhouettes then droppedInputs = droppedInputs[2] end
 
@@ -360,12 +360,12 @@ elseif opt.expType == 'forwardPass' then
 elseif opt.expType == 'NNs' then
 
 	print ("==> Doing the nearest neighbors experiment")
-	print ("==> Configurations - Loss: " .. opt.lossText .. ", expDirName: " .. opt.expDirName .. ", No. Latents: " .. opt.nLatents .. ", Batch Size: " .. opt.batchSize .. ", Batch Size Change Epoch: " .. opt.batchSizeChangeEpoch .. ", Batch Size Change: " .. opt.batchSizeChange .. ", Target Batch Size: " .. opt.targetBatchSize .. ", No. Output Channels: " .. opt.nCh .. ", LR Decay: " .. opt.lrDecay .. ", Learning Rate: " .. opt.lr .. ", InitialLR: " .. opt.initialLR .. ", Network Type: " .. opt.modelType .. ", Tanh: " .. (opt.tanh and "True" or "False") .. ', dropVPs: ' .. (opt.dropVPs and "True" or "False") .. ', notDropVP: ' .. opt.notDropVP .. ', silhouettes: ' .. (opt.silhouettes and "True" or "False") .. ', onlySilhouettes: ' .. (opt.onlySilhouettes and "True" or "False") .. ', unknownVPs: ' .. (opt.unknownVPs and "True" or "False") .. ', conditional: ' .. (opt.conditional and "True" or "False"))
+	print ("==> Configurations - Loss: " .. opt.lossText .. ", expDirName: " .. opt.expDirName .. ", No. Latents: " .. opt.nLatents .. ", Batch Size: " .. opt.batchSize .. ", Batch Size Change Epoch: " .. opt.batchSizeChangeEpoch .. ", Batch Size Change: " .. opt.batchSizeChange .. ", Target Batch Size: " .. opt.targetBatchSize .. ", No. Output Channels: " .. opt.nCh .. ", LR Decay: " .. opt.lrDecay .. ", Learning Rate: " .. opt.lr .. ", InitialLR: " .. opt.initialLR .. ", Network Type: " .. opt.modelType .. ", Tanh: " .. (opt.tanh and "True" or "False") .. ', dropVPs: ' .. (opt.dropVPs and "True" or "False") .. ', notDropVP: ' .. opt.notDropVP .. ', silhouettes: ' .. (opt.silhouettes and "True" or "False") .. ', onlySilhouettes: ' .. (opt.onlySilhouettes and "True" or "False") .. ', singleVPNet: ' .. (opt.singleVPNet and "True" or "False") .. ', conditional: ' .. (opt.conditional and "True" or "False"))
 	storagePath = storagePath .. 'nearestNeighbors'
 	-- Doing nearest neighbors in Z space
 	local samplesPath = 'ExtraData/samples'
 	-- local samplesPath = '/home/amir/Desktop/samples/Unconditional'
-	if opt.unknownVPs then
+	if opt.singleVPNet then
 		if opt.onlySilhouettes then
 			samplesPath = samplesPath .. '/SingleVPNet-Silhouettes/empirical'
 		else
@@ -398,7 +398,7 @@ elseif opt.expType == 'NNs' then
 		local localZs = torch.zeros(data.dataset:size(1), opt.nLatents):cuda()
 		local localLabels = torch.zeros(data.dataset:size(1))
 		for j=1, data.dataset:size(1) do
-			local droppedInputs = commonFuncs.dropInputVPs(data.dataset[{{j}}], opt.notDropVP, false, numDropVPs, dropIndices, opt.unknownVPs)
+			local droppedInputs = commonFuncs.dropInputVPs(data.dataset[{{j}}], opt.notDropVP, false, numDropVPs, dropIndices, opt.singleVPNet)
 
 			local maskInputs = droppedInputs:clone()
 			maskInputs[maskInputs:gt(0)] = 1
@@ -461,7 +461,7 @@ elseif opt.expType == 'NNs' then
 	local samplesZs = torch.Tensor(depthMapsTensor:size(1), opt.nLatents):cuda()
 	for i=1, depthMapsTensor:size(1) do
 		local inputs = not opt.onlySilhouettes and depthMapsTensor[{{i}}] or {depthMapsTensor[{{i}}], masksTensor[{{i}}]}
-		local droppedInputs = commonFuncs.dropInputVPs(inputs, opt.dropVPs and opt.notDropVP or nil, true, numDropVPs, dropIndices, opt.unknownVPs)
+		local droppedInputs = commonFuncs.dropInputVPs(inputs, opt.dropVPs and opt.notDropVP or nil, true, numDropVPs, dropIndices, opt.singleVPNet)
 		droppedInputs = not opt.onlySilhouettes and torch.cat(droppedInputs, droppedInputs, 1) or {torch.cat(droppedInputs[1], droppedInputs[1], 1), torch.cat(droppedInputs[2], droppedInputs[2], 1)}
 		droppedInputs = not opt.onlySilhouettes and droppedInputs:cuda() or droppedInputs[2]:cuda()
 		-- if opt.onlySilhouettes then droppedInputs = droppedInputs[2] end
@@ -541,7 +541,7 @@ elseif opt.expType == 'tSNE' then
 			local localZs = torch.zeros(data.dataset:size(1), opt.nLatents):cuda()
 			local localLabels = torch.zeros(data.dataset:size(1))
 			for j=1, data.dataset:size(1) do
-				local droppedInputs = commonFuncs.dropInputVPs(data.dataset[{{j}}], opt.notDropVP, false, numDropVPs, dropIndices, opt.unknownVPs)
+				local droppedInputs = commonFuncs.dropInputVPs(data.dataset[{{j}}], opt.notDropVP, false, numDropVPs, dropIndices, opt.singleVPNet)
 
 				local maskInputs = droppedInputs:clone()
 				maskInputs[maskInputs:gt(0)] = 1

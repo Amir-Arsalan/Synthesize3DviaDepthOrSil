@@ -9,7 +9,7 @@ local commonFuncs = require '0_commonFuncs'
 
 local sampleManifold = {}
 
-function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, data, model, modelPath, samplesPath, mean, var, nLatents, imgSize, numVPs, epoch, sampleOnly, testPhase, tanh, dropoutNet, VpToKeep, onlySilhouettes, sampleZembeddings, singleVPNet, conditional, expType, benchmark)
+function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, data, model, modelPath, samplesPath, mean, var, nLatents, imgSize, numVPs, epoch, batchSize, targetBatchSize, sampleOnly, testPhase, tanh, dropoutNet, VpToKeep, onlySilhouettes, sampleZembeddings, singleVPNet, conditional, expType, benchmark)
     local conditionalAvailable = conditional and 1 or 0
     if sampleOnly and modelPath ~= '' then
         require 'nngraph'
@@ -147,6 +147,7 @@ function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, d
                 print ("==> Doing interpolation and sampling around randomly-selected data samples' Z-vectors. Configs - Number of Samples: " .. nSamples - 2 .. ", Canvas Size: " .. canvasHW - 1 .. " X " .. canvasHW - 1)
                 nSamples = nSamples - 1 --Just to save computation time
                 canvasHW = canvasHW - 1 --Just to save computation time
+                local classID = 0
                 for class=1, #data.category do
                     local continueFlag = false
                     if #sampleCategory > 0 then
@@ -174,12 +175,12 @@ function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, d
                         local matchingElements = data.labels:eq(torch.Tensor(data.dataset:size(1)):fill(class)) -- Find the samples within one of the classes
                         if matchingElements:sum() > 1 then
                             local tempData = data.dataset:index(1, torch.range(1, data.dataset:size(1))[matchingElements]:long()):clone() -- Extract the samples belonging to the class of interest
-                            local batchIndices = torch.randperm(tempData:size(1)):long():split(2)
+                            local batchIndices = torch.randperm(tempData:size(1)):long():split(math.max(math.ceil(batchSize/2), targetBatchSize))
 
                             -- Correct the last index set size
                             if #batchIndices > 1 then
                                 local tempbatchIndices = {}
-                                for ll=1, tempData:size(1) - 2 * (#batchIndices - 1) do
+                                for ll=1, tempData:size(1) - math.max(math.ceil(batchSize/2), targetBatchSize) * (#batchIndices - 1) do
                                     tempbatchIndices[ll] = batchIndices[#batchIndices][ll]
                                 end
                                 batchIndices[#batchIndices] = torch.LongTensor(tempbatchIndices)
@@ -214,11 +215,10 @@ function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, d
                                         silhouettes[silhouettes:gt(0)] = 1
                                     end
 
-                                    -- local permutedInput
                                     local predClassVec
                                     if dropoutNet or singleVPNet then
                                         droppedInputs = commonFuncs.dropInputVPs({depthMaps, silhouettes}, not singleVPNet and VpToKeep or nil, true, numOfVPsToDrop, dropIndices, singleVPNet, pickedVPs)
-                                        if opt.conditional then
+                                        if conditional then
                                             mean, log_var, predictedClassScores = unpack(model:get(2):forward(not opt.onlySilhouettes and droppedInputs[1] or droppedInputs[2]))
                                             predClassVec = commonFuncs.computeClassificationAccuracy(predictedClassScores, nil, true, #data.category)
                                             model:get(conditionalAvailable+4):forward({model:get(3):forward({mean, log_var}), predClassVec})
@@ -226,12 +226,8 @@ function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, d
                                             model:forward(not opt.onlySilhouettes and droppedInputs[1] or droppedInputs[2])
                                         end
                                     else
-                                        print (depthMaps:size())
-                                        print (silhouettes:size())
                                         droppedInputs = commonFuncs.dropInputVPs(not onlySilhouettes and depthMaps or silhouettes, nil, true, numOfVPsToDrop, dropIndices, singleVPNet, pickedVPs)
-                                        print (droppedInputs:size())
-                                        os.exit()
-                                        if opt.conditional then
+                                        if conditional then
                                             mean, log_var, predictedClassScores = unpack(model:get(2):forward(droppedInputs))
                                             predClassVec = commonFuncs.computeClassificationAccuracy(predictedClassScores, nil, true, #data.category)
                                             model:get(conditionalAvailable+4):forward({model:get(3):forward({mean, log_var}), predClassVec})
@@ -250,6 +246,12 @@ function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, d
                                     collectgarbage()
                                     if tanh then originalReconstructions = commonFuncs.normalizeBackToZeroToOne(originalReconstructions) dataBeingUsed = commonFuncs.normalizeBackToZeroToOne(dataBeingUsed) end
 
+                                    -- Create hot vectors for class-conditional interpolations
+                                    local targetClassHotVec
+                                    if conditional then
+                                        targetClassHotVec = torch.zeros(2, #data.category):cuda()
+                                        targetClassHotVec[{{}, {class}}] = 1
+                                    end
 
                                     local zVecPrevExample
                                     local canvas = torch.Tensor(numVPs, canvasHW * imgSize, canvasHW * imgSize)
@@ -312,7 +314,7 @@ function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, d
                                                     end
 
                                                     if sampleType ~= 'data' then
-                                                        interpolationReconstructions = model:get(conditionalAvailable+4):forward(conditionalAvailable == 0 and zInterpolations or {zInterpolations, predClassVec})
+                                                        interpolationReconstructions = model:get(conditionalAvailable+4):forward(conditionalAvailable == 0 and zInterpolations or {zInterpolations, targetClassHotVec})
                                                         interpolationSilhouettesReconstructions = interpolationReconstructions[2]:clone():type(torch.getdefaulttensortype())
                                                         interpolationReconstructions[2] = nil
                                                         interpolationReconstructions = interpolationReconstructions[1]:clone():type(torch.getdefaulttensortype())
