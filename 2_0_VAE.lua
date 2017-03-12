@@ -2,6 +2,7 @@ require 'torch'
 require 'nn'
 
 local VAE = {}
+local SpatialDilatedConvolution = nn.SpatialDilatedConvolution
 local SpatialConvolution = nn.SpatialConvolution
 local SpatialFullConvolution = nn.SpatialFullConvolution
 local SpatialBatchNormalization = nn.SpatialBatchNormalization
@@ -42,13 +43,16 @@ local function shortcut(nInputPlane, nOutputPlane, stride, unconv)
         -- Do convolution
         s = nn.Sequential()
         if not unconv or unconv == false then
-            s:add(SpatialConvolution(nInputPlane, nOutputPlane, 4, 1, stride, stride, 1, 1))
-            s:add(SpatialConvolution(nOutputPlane, nOutputPlane, 1, 4, 1, 1, 0, 1))
-            -- s:add(SpatialConvolution(nInputPlane, nOutputPlane, 4, 4, stride, stride, 1, 1))
+            s:add(SpatialDilatedConvolution(nInputPlane, nOutputPlane, 4, 1, stride, stride, 1, 1, 2, 2))
+            s:add(SpatialDilatedConvolution(nOutputPlane, nOutputPlane, 1, 4, 1, 1))
+
+            -- Uncomment the line below have full filters (adds more parameters)
+            -- s:add(SpatialDilatedConvolution(nInputPlane, nOutputPlane, 4, 4, stride, stride, 1, 1, 2, 2))
             return s            
         else
             s:add(SpatialFullConvolution(nInputPlane, nOutputPlane, 1, 4, stride, stride, 1, 1))
             s:add(SpatialFullConvolution(nOutputPlane, nOutputPlane, 4, 1, 1, 1, 0, 0))
+            -- Uncomment the line below have full filters (adds more parameters)
             -- s:add(SpatialFullConvolution(nInputPlane, nOutputPlane, 4, 4, stride, stride, 1, 1))
             return s            
         end
@@ -58,11 +62,13 @@ local function shortcut(nInputPlane, nOutputPlane, stride, unconv)
         if not unconv or unconv == false then
             s:add(SpatialConvolution(nInputPlane,nOutputPlane,4,1))
             s:add(SpatialConvolution(nOutputPlane,nOutputPlane,1,4))
+            -- Uncomment the line below have full filters (adds more parameters)
             -- s:add(SpatialConvolution(nInputPlane,nOutputPlane,4,4))
             return s
         else
             s:add(SpatialFullConvolution(nInputPlane,nOutputPlane,1,4))
             s:add(SpatialFullConvolution(nOutputPlane,nOutputPlane,4,1))
+            -- Uncomment the line below have full filters (adds more parameters)
             -- s:add(SpatialFullConvolution(nInputPlane,nOutputPlane,4,4))
             return s
         end
@@ -91,30 +97,36 @@ local function basicblock(n, nO, stride, Type, unconv)
         if not unconv or unconv == false then
             s:add(SpatialConvolution(nInputPlane,nOutputPlane,3,1,1,1,1,1))
             s:add(SpatialConvolution(nOutputPlane,nOutputPlane,1,3,1,1,0,0))
+            -- Uncomment the line below have full filters (adds more parameters)
             -- s:add(SpatialConvolution(nInputPlane,nOutputPlane,3,3,1,1,1,1))
         else
             s:add(SpatialFullConvolution(nInputPlane,nOutputPlane,1,3,1,1,1,1))
             s:add(SpatialFullConvolution(nOutputPlane,nOutputPlane,3,1,1,1,0,0))
+            -- Uncomment the line below have full filters (adds more parameters)
             -- s:add(SpatialFullConvolution(nInputPlane,nOutputPlane,3,3,1,1,1,1))
         end
     elseif stride and stride > 1 then
         if not unconv or unconv == false then
-            s:add(SpatialConvolution(nInputPlane,nOutputPlane,4,1,stride,stride,1,1))
-            s:add(SpatialConvolution(nOutputPlane,nOutputPlane,1,4,1,1,0,1))
-            -- s:add(SpatialConvolution(nInputPlane,nOutputPlane,4,4,stride,stride,1,1))
+            s:add(SpatialDilatedConvolution(nInputPlane, nOutputPlane, 4, 1, stride, stride, 1, 1, 2, 2))
+            s:add(SpatialDilatedConvolution(nOutputPlane, nOutputPlane, 1, 4, 1, 1))
+            -- Uncomment the line below have full filters (adds more parameters)
+            -- s:add(SpatialDilatedConvolution(nInputPlane,nOutputPlane,4,4,stride,stride,1,1, 2, 2))
         else
             s:add(SpatialFullConvolution(nInputPlane,nOutputPlane,1,4,stride,stride,1,1))
             s:add(SpatialFullConvolution(nOutputPlane,nOutputPlane,4,1,1,1,0,0))
+            -- Uncomment the line below have full filters (adds more parameters)
             -- s:add(SpatialFullConvolution(nInputPlane,nOutputPlane,4,4,stride,stride,1,1))
         end
     else
         if not unconv or unconv == false then
             s:add(SpatialConvolution(nInputPlane,nOutputPlane,4,1))
             s:add(SpatialConvolution(nOutputPlane,nOutputPlane,1,4))
+            -- Uncomment the line below have full filters (adds more parameters)
             -- s:add(SpatialConvolution(nInputPlane,nOutputPlane,4,4))
         else
             s:add(SpatialFullConvolution(nInputPlane,nOutputPlane,1,4))
             s:add(SpatialFullConvolution(nOutputPlane,nOutputPlane,4,1))
+            -- Uncomment the line below have full filters (adds more parameters)
             -- s:add(SpatialFullConvolution(nInputPlane,nOutputPlane,4,4))
         end
     end
@@ -125,10 +137,12 @@ local function basicblock(n, nO, stride, Type, unconv)
     if not unconv or unconv == false then
         s:add(SpatialConvolution(nOutputPlane,nOutputPlane,3,1,1,1,1,1))
         s:add(SpatialConvolution(nOutputPlane,nOutputPlane,1,3,1,1,0,0))
+        -- Uncomment the line below have full filters (adds more parameters)
         -- s:add(SpatialConvolution(nOutputPlane,nOutputPlane,3,3,1,1,1,1))
     else
         s:add(SpatialFullConvolution(nOutputPlane,nOutputPlane,1,3,1,1,1,1))
         s:add(SpatialFullConvolution(nOutputPlane,nOutputPlane,3,1,1,1,0,0))
+        -- Uncomment the line below have full filters (adds more parameters)
         -- s:add(SpatialFullConvolution(nOutputPlane,nOutputPlane,3,3,1,1,1,1))
     end
 
@@ -163,20 +177,39 @@ function VAE.get_encoder(modelParams)
     local numCats = modelParams[7]
 
     local encoder = nn.Sequential()
-    encoder:add(SpatialConvolution(not singleVPNet and nInputCh or 1, nOutputCh * 4, 4, 4, 2, 2, 1, 1))
+    encoder:add(SpatialDilatedConvolution(not singleVPNet and nInputCh or 1, nOutputCh * 4, 4, 4, 2, 2, 1, 1, 2, 2))
     encoder:add(SpatialBatchNormalization(nOutputCh * 4)):add(nn.ReLU(true))
-    -- feature map size: 112 x 112
+
+
+    -- Dilated Convolution
+    -- feature map size: 110 x 110
     encoder:add(residualBlock(basicblock, nOutputCh * 4, nOutputCh * 6, 1, 2, 'first'))
-    -- feature map size: 56 x 56
+    -- feature map size: 53 x 53
     encoder:add(residualBlock(basicblock, nOutputCh * 6, nOutputCh * 7, 1, 2))
-    -- feature map size: 28 x 28
-    encoder:add(residualBlock(basicblock, nOutputCh * 7, nOutputCh * 8, 1, 2))
-    -- feature map size: 14 x 14
-    encoder:add(residualBlock(basicblock, nOutputCh * 8, nOutputCh * 6, 1, 2))
-    -- feature map size: 7 x 7
-    encoder:add(residualBlock(basicblock, nOutputCh * 6, nOutputCh, 1))
+    -- feature map size: 25 x 25
+    encoder:add(residualBlock(basicblock, nOutputCh * 7, nOutputCh * 6, 1, 2))
+    -- feature map size: 11 x 11
+    encoder:add(residualBlock(basicblock, nOutputCh * 6, nOutputCh, 1, 2))
     encoder:add(ShareGradInput(SpatialBatchNormalization(nOutputCh), 'last'))
     -- feature map size: 4 x 4
+
+
+    -- Normal Convolution
+
+    -- -- Replace "SpatialDilatedConvolution" with "SpatialConvolution"
+    -- -- in this file to be able to use normal convolution
+    -- -- feature map size: 112 x 112
+    -- encoder:add(residualBlock(basicblock, nOutputCh * 4, nOutputCh * 6, 1, 2, 'first'))
+    -- -- feature map size: 56 x 56
+    -- encoder:add(residualBlock(basicblock, nOutputCh * 6, nOutputCh * 7, 1, 2))
+    -- -- feature map size: 28 x 28
+    -- encoder:add(residualBlock(basicblock, nOutputCh * 7, nOutputCh * 8, 1, 2))
+    -- -- feature map size: 14 x 14
+    -- encoder:add(residualBlock(basicblock, nOutputCh * 8, nOutputCh * 6, 1, 2))
+    -- -- feature map size: 7 x 7
+    -- encoder:add(residualBlock(basicblock, nOutputCh * 6, nOutputCh, 1))
+    -- encoder:add(ShareGradInput(SpatialBatchNormalization(nOutputCh), 'last'))
+    -- -- feature map size: 4 x 4
 
 
     encoder:add(nn.View(nOutputCh * 4 * 4))
@@ -185,10 +218,10 @@ function VAE.get_encoder(modelParams)
     mean_logvar:add(nn.Linear(nOutputCh * 4 * 4, nLatents)) -- Log of the variances
     if conditional then
         mean_logvar:add(nn.Sequential()
-        :add(nn.Linear(nOutputCh * 4 * 4, nOutputCh * 4 * 4/2))
-        :add(nn.BatchNormalization(nOutputCh * 4 * 4/2))
+        :add(nn.Linear(nOutputCh * 4 * 4, nOutputCh * 4 * 3))
+        -- :add(nn.BatchNormalization(nOutputCh * 4 * 3))
         :add(nn.ReLU(true))
-        :add(nn.Linear(nOutputCh * 4 * 4/2, numCats)))
+        :add(nn.Linear(nOutputCh * 4 * 3, numCats)))
     end
     encoder:add(mean_logvar)
 

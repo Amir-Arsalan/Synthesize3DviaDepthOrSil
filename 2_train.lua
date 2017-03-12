@@ -39,21 +39,21 @@ if not opt then
     cmd:option('-fromScratch', 0, "It indicates whether to use the pre-stored, resized data or do the process of resizing again: 0 | 1")
     cmd:option('-imgSize', 224, '3D grid size. E.g. 224')
     -- Model:
-    cmd:option('-nCh', 64, "A multiplier to control the number of feature maps for each convolutional layer")
-    cmd:option('-nLatents', 225, 'Determines the number of latent variables: Any positive real number')
+    cmd:option('-nCh', 64, "Base number of feature maps for each convolutional layer")
+    cmd:option('-nLatents', 400, 'The number of latent variables in the Z layer')
     cmd:option('-tanh', 0, "Set to 1 if you want to normalize the input/output values to be between -1 and 1 instead of 0 to 1")
     -- Training:
-    cmd:option('-batchSize', 8, 'Batch size for training (SGD): any integer number (1 or higher)')
-    cmd:option('-batchSizeChangeEpoch', 15, 'Change the batch size every opt.batchSizeChangeEpoch epochs: any integer number (1 or higher)')
+    cmd:option('-batchSize', 4, 'Batch size for training (SGD): any integer number (1 or higher)')
+    cmd:option('-batchSizeChangeEpoch', 15, 'Changes the batch size every X epochs')
     cmd:option('-batchSizeChange', 5, 'The number to be subtracted/added every opt.batchSizeChangeEpoch from opt.batchSize: any integer number (1 or higher)')
-    cmd:option('-targetBatchSize', 25, 'The minimum batch size for training (SGD): any integer number (2 or higher)')
+    cmd:option('-targetBatchSize', 8, 'Maximum batch size (could be set equal to batchSize)')
     cmd:option('-nReconstructions', 50, 'An integer indicating how many reconstuctions to be generated from the test data set')
-    cmd:option('-initialLR', 0.000003, 'The learning rate to be used for the very first few epochs of training: Any positive small decimal value')
-    cmd:option('-lr', 0.00022, 'The learning rate: Any positive decimal value')
-    cmd:option('-lrDecay', 0.97, 'A number by which the original learning rate will be multiplied on each epoch: Any real number')
-    cmd:option('-maxEpochs', 250, 'The maximum number of epochs: Any positive real number')
-    cmd:option('-dropoutNet', 0, 'Indicates whether 15 to 18 views should be dropped during training')
-    cmd:option('-VpToKeep', 100, 'Drops all VPs except this one [0 ... 19]. Leave at 100 if do not want to drop a specific VP')
+    cmd:option('-initialLR', 0.0000035, 'The learning rate to be used for the first few epochs of training')
+    cmd:option('-lr', 0.000085, 'The learning rate: Any positive decimal value')
+    cmd:option('-lrDecay', 0.97, 'The rate to aneal the learning rate')
+    cmd:option('-maxEpochs', 60, 'The maximum number of epochs')
+    cmd:option('-dropoutNet', 0, 'Set to 1 to drop 15 to 18 views during training')
+    cmd:option('-VpToKeep', 100, 'Drops all VPs except this one. The valid range is [0 ... opt.numVPs]. Set it to > opt.numVPs to ignore')
     cmd:option('-onlySilhouettes', 0, 'Indicates whether only the silhouettes must be used for training')
     cmd:option('-singleVPNet', 0, 'If set to 1, will perform random permutation on the input vector view point channels')
     cmd:option('-conditional', 0, 'Indicates whether the model is trained conditionally')
@@ -184,7 +184,6 @@ if trainDataFiles then -- If there are training files on disk
         classLabelCriterion = classLabelCriterion:cuda()
     end
 
-
     -- Some code to draw computational graph
     -- dummy_x = torch.rand(dim_input)
     -- model:forward({dummy_x})
@@ -198,7 +197,7 @@ if trainDataFiles then -- If there are training files on disk
     -- Transfer the model and the data to the GPU, if there is enough memory on the GPU for both the model and data batch
     model:evaluate()
     local parameters, gradients = gMod:getParameters()
-    print ("==> Configurations, expDirName: " .. opt.expDirName .. ", No. Latents: " .. opt.nLatents .. ", Batch Size: " .. batch_size .. ", Batch Size Change Epoch: " .. opt.batchSizeChangeEpoch .. ", Batch Size Change: " .. opt.batchSizeChange .. ", Target Batch Size: " .. opt.targetBatchSize .. ", No. Output Channels: " .. opt.nCh .. ", LR Decay: " .. opt.lrDecay .. ", Learning Rate: " .. opt.lr .. ", InitialLR: " .. opt.initialLR .. ", Tanh: " .. (opt.tanh and "True" or "False") .. ', DropoutNet: ' .. (opt.dropoutNet and "True" or "False") .. ', KeepVP: ' .. opt.VpToKeep .. ', onlySilhouettes: ' .. (opt.onlySilhouettes and "True" or "False") .. ', singleVPNet: ' .. (opt.singleVPNet and "True" or "False") .. ', conditional: ' .. (opt.conditional and "True" or "False"))
+    print ("==> Configurations, expDirName: " .. opt.expDirName .. ", No. Latents: " .. opt.nLatents .. ", Batch Size: " .. batch_size .. ", Batch Size (BS) Change Epoch: " .. opt.batchSizeChangeEpoch .. ", BS Change: " .. opt.batchSizeChange .. ", Target BS: " .. opt.targetBatchSize .. ", Output Fea. Maps: " .. opt.nCh .. ", LR Decay: " .. opt.lrDecay .. ", Learning Rate: " .. opt.lr .. ", InitialLR: " .. opt.initialLR .. ", KLD Grad. Coeff:" .. opt.KLD .. ", Tanh: " .. (opt.tanh and "True" or "False") .. ', DropoutNet: ' .. (opt.dropoutNet and "True" or "False") .. ', KeepVP: ' .. opt.VpToKeep .. ', onlySilhouettes: ' .. (opt.onlySilhouettes and "True" or "False") .. ', singleVPNet: ' .. (opt.singleVPNet and "True" or "False") .. ', conditional: ' .. (opt.conditional and "True" or "False"))
 
     -- Start training, validation and testing
     model:training()
@@ -224,6 +223,7 @@ if trainDataFiles then -- If there are training files on disk
     local state = {}
 
     print ("==> Number of Model Parameters: " .. parameters:nElement())
+    print ''
     while continueTraining and epoch <= opt.maxEpochs do
 
         local totalError = 0
@@ -382,9 +382,9 @@ if trainDataFiles then -- If there are training files on disk
         trainClassAccuracyList[epoch] = trainClassAccuracyList[epoch]/numTrainSamples
 
         if opt.conditional then
-            print(string.format("==> Epoch: %d, Total Err: %d, KLD: %.1f, Sil. Err: %d, Depth Map Err: %d, Class. Err: %.2f, Acc: %.3f", epoch, totalError/numTrainSamples, trainKLDErrList[epoch], trainSilhouetteErrList[epoch], trainDepthMapErrList[epoch], trainClassErrList[epoch], trainClassAccuracyList[epoch]) .. ". No. Train 3D Models: " .. numTrainSamples)
+            print(string.format("==> Epoch: %d, Total Err: %d, KLD: %.1f, Sil. Err: %d, Depth Err: %d, Class. Err: %.2f, Acc: %.3f", epoch, totalError/numTrainSamples, trainKLDErrList[epoch], trainSilhouetteErrList[epoch], trainDepthMapErrList[epoch], trainClassErrList[epoch], trainClassAccuracyList[epoch]) .. ". No. Train 3D Models: " .. numTrainSamples)
         else
-            print(string.format("==> Epoch: %d, Total Err: %d, KLD: %.1f, Sil. Err: %d, Depth Map Err: %d", epoch, totalError/numTrainSamples, trainKLDErrList[epoch], trainSilhouetteErrList[epoch], trainDepthMapErrList[epoch]) .. ". No. Train 3D Models: " .. numTrainSamples)
+            print(string.format("==> Epoch: %d, Total Err: %d, KLD: %.1f, Sil. Err: %d, Depth Err: %d", epoch, totalError/numTrainSamples, trainKLDErrList[epoch], trainSilhouetteErrList[epoch], trainDepthMapErrList[epoch]) .. ". No. Train 3D Models: " .. numTrainSamples)
         end
 
         data = nil
@@ -501,9 +501,9 @@ if trainDataFiles then -- If there are training files on disk
         validClassErrList[epoch] = validClassErrList[epoch]/numValidSamples
         validClassAccuracyList[epoch] = validClassAccuracyList[epoch]/numValidSamples
         if opt.conditional then
-            print(string.format("==> Epoch: %d, Total Err: %d, KLD: %.1f, Sil. Err: %d, Depth Map Err: %d, Class. Err. %.2f, Acc: %.3f", epoch, validationTotalError/numValidSamples, validKLDErrList[epoch], validSilErrList[epoch], validDepthMapErrList[epoch], validClassErrList[epoch], validClassAccuracyList[epoch]) .. ". No. Valid. 3D Models: " .. numValidSamples)
+            print(string.format("==> Epoch: %d, Total Err: %d, KLD: %.1f, Sil. Err: %d, Depth Err: %d, Class. Err. %.2f, Acc: %.3f", epoch, validationTotalError/numValidSamples, validKLDErrList[epoch], validSilErrList[epoch], validDepthMapErrList[epoch], validClassErrList[epoch], validClassAccuracyList[epoch]) .. ". No. Valid. 3D Models: " .. numValidSamples)
         else
-            print(string.format("==> Epoch: %d, Total Err: %d, KLD: %.1f, Sil. Err: %d, Depth Map Err: %d", epoch, validationTotalError/numValidSamples, validKLDErrList[epoch], validSilErrList[epoch], validDepthMapErrList[epoch]) .. ". No. Valid. 3D Models: " .. numValidSamples)
+            print(string.format("==> Epoch: %d, Total Err: %d, KLD: %.1f, Sil. Err: %d, Depth Err: %d", epoch, validationTotalError/numValidSamples, validKLDErrList[epoch], validSilErrList[epoch], validDepthMapErrList[epoch]) .. ". No. Valid. 3D Models: " .. numValidSamples)
         end
 
         data = nil

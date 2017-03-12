@@ -10,7 +10,7 @@ local commonFuncs = require '0_commonFuncs'
 local sampleManifold = {}
 
 function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, data, model, modelPath, samplesPath, mean, var, nLatents, imgSize, numVPs, epoch, batchSize, targetBatchSize, sampleOnly, testPhase, tanh, dropoutNet, VpToKeep, onlySilhouettes, sampleZembeddings, singleVPNet, conditional, expType, benchmark)
-    local conditionalAvailable = conditional and 1 or 0
+    local conditionalModel = conditional and 1 or 0
     if sampleOnly and modelPath ~= '' then
         require 'nngraph'
         require '2_2_Sampler'
@@ -105,7 +105,7 @@ function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, d
                                     targetClassLabels[l][c] = 1
                                 end
                                 targetClassLabels = targetClassLabels:type(model:type())
-                                reconstruction = model:get(conditionalAvailable+4):forward({z, targetClassLabels})
+                                reconstruction = model:get(conditionalModel+4):forward({z, targetClassLabels})
                             else
                                 reconstruction = model:get(4):forward(z)
                             end
@@ -221,7 +221,7 @@ function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, d
                                         if conditional then
                                             mean, log_var, predictedClassScores = unpack(model:get(2):forward(not opt.onlySilhouettes and droppedInputs[1] or droppedInputs[2]))
                                             predClassVec = commonFuncs.computeClassificationAccuracy(predictedClassScores, nil, true, #data.category)
-                                            model:get(conditionalAvailable+4):forward({model:get(3):forward({mean, log_var}), predClassVec})
+                                            model:get(conditionalModel+4):forward({model:get(3):forward({mean, log_var}), predClassVec})
                                         else
                                             model:forward(not opt.onlySilhouettes and droppedInputs[1] or droppedInputs[2])
                                         end
@@ -230,14 +230,14 @@ function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, d
                                         if conditional then
                                             mean, log_var, predictedClassScores = unpack(model:get(2):forward(droppedInputs))
                                             predClassVec = commonFuncs.computeClassificationAccuracy(predictedClassScores, nil, true, #data.category)
-                                            model:get(conditionalAvailable+4):forward({model:get(3):forward({mean, log_var}), predClassVec})
+                                            model:get(conditionalModel+4):forward({model:get(3):forward({mean, log_var}), predClassVec})
                                         else
                                             model:forward(droppedInputs)
                                         end
                                     end
                                     
                                     local dataBeingUsed = depthMaps:clone()
-                                    local reconstructions = model:get(conditionalAvailable+4).output
+                                    local reconstructions = model:get(conditionalModel+4).output
                                     local originalSilhouettes = depthMaps:clone()
 
                                     local originalSilhouettesReconstructions = reconstructions[2]:clone():type(torch.getdefaulttensortype())
@@ -293,7 +293,7 @@ function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, d
                                                 local zInterpolations = interpolationZVectors[{{j}}]:repeatTensor(2, 1)
                                                 zSamples = zSamples:cuda() zInterpolations = zInterpolations:cuda()
                                                 if sampleType ~= 'interpolate' then
-                                                    samplesReconstructions = model:get(conditionalAvailable+4):forward(zSamples)
+                                                    samplesReconstructions = model:get(conditionalModel+4):forward(zSamples)
                                                     samplesSilhouettesReconstructions = samplesReconstructions[2]:clone():type(torch.getdefaulttensortype())
                                                     samplesReconstructions[2] = nil
                                                     samplesReconstructions = samplesReconstructions[1]:clone():type(torch.getdefaulttensortype())
@@ -314,7 +314,7 @@ function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, d
                                                     end
 
                                                     if sampleType ~= 'data' then
-                                                        interpolationReconstructions = model:get(conditionalAvailable+4):forward(conditionalAvailable == 0 and zInterpolations or {zInterpolations, targetClassHotVec})
+                                                        interpolationReconstructions = model:get(conditionalModel+4):forward(conditionalModel == 0 and zInterpolations or {zInterpolations, targetClassHotVec})
                                                         interpolationSilhouettesReconstructions = interpolationReconstructions[2]:clone():type(torch.getdefaulttensortype())
                                                         interpolationReconstructions[2] = nil
                                                         interpolationReconstructions = interpolationReconstructions[1]:clone():type(torch.getdefaulttensortype())
