@@ -33,7 +33,8 @@ Note: All zip files must have the format described above
 How to run the code:
 If the purpose is to process the ModelNet40 data from scratch run:
 
-* th main.lua -testPhase 0 -batchSize 4 -nLatents 420 -rawDataType 'int' -zip 1 -fromScratch 1 -nCh 64 -maxEpochs 50 -sampleType 'interpolate' -nSamples 6 -lr 0.000085 -initialLR 0.000002 -lrDecay 0.98 -nReconstructions 30 -sampleOnly 0 -batchSizeChangeEpoch 20 -batchSizeChange 2 -targetBatchSize 8 -modelPath "" -var 1 -mean 0 -canvasHW 4 -tanh 0 -dropoutNet 0 -onlySilhouettes 0  -singleVPNet 1 -maxMemory 4000 -KLD 80 -benchmark 1 -conditional 1 -expDirName "ResNet-64Chs-lr0.000085-L1L1-KLD70-420Z-BS4-Conditional"
+* th main.lua -testPhase 0 -batchSize 4 -nLatents 420 -rawDataType 'int' -zip 1 -fromScratch 1 -nCh 64 -maxEpochs 50 -sampleType 'interpolate' -nSamples 6 -lr 0.000085 -initialLR 0.000002 -lrDecay 0.98 -nReconstructions 30 -sampleOnly 0 -batchSizeChangeEpoch 20 -batchSizeChange 2 -targetBatchSize 8 -modelPath "" -var 1 -mean 0 -canvasHW 4 -tanh 0 -dropoutNet 0 -onlySilhouettes 0  -singleVPNet 1 -maxMemory 
+0 -KLD 80 -benchmark 1 -conditional 1 -expDirName "ResNet-64Chs-lr0.000085-L1L1-KLD70-420Z-BS4-Conditional"
 
 After running the above command the program uncompresses the .zip files and stores the images into Torch tensors for training and validation phase. Then it starts the training and stores the intermediate results, if any, in /expDirName.
 For the next runs use -zip 0 -fromScratch 0 arguments.
@@ -44,7 +45,7 @@ For the next runs use -zip 0 -fromScratch 0 arguments.
 ## Unconditional training:
 ### AllVPNet:
 
-* th main.lua -testPhase 0 -batchSize 4 -nLatents 400 -rawDataType 'int' -zip 0 -fromScratch 0 -nCh 64 -maxEpochs 50 -sampleType 'interpolate' -nSamples 6 -lr 0.000085 -initialLR 0.000002 -lrDecay 0.98 -nReconstructions 30 -sampleOnly 0 -batchSizeChangeEpoch 20 -batchSizeChange 2 -targetBatchSize 8 -modelPath "" -var 1 -mean 0 -canvasHW 4 -tanh 0 -dropoutNet 0 -VpToKeep 30 -onlySilhouettes 0  -singleVPNet 0 -maxMemory 4000 -KLD 80 -benchmark 1 -conditional 0 -expDirName "ResNet-64Chs-lr0.000085-L1L1-KLD80-350Z-BS4-AllVPNet-Depth"
+* th main.lua -testPhase 0 -batchSize 4 -nLatents 420 -rawDataType 'int' -zip 0 -fromScratch 0 -nCh 64 -maxEpochs 50 -sampleType 'interpolate' -nSamples 6 -lr 0.000085 -initialLR 0.000002 -lrDecay 0.98 -nReconstructions 30 -sampleOnly 0 -batchSizeChangeEpoch 20 -batchSizeChange 2 -targetBatchSize 8 -modelPath "" -var 1 -mean 0 -canvasHW 4 -tanh 0 -dropoutNet 0 -VpToKeep 30 -onlySilhouettes 0  -singleVPNet 0 -maxMemory 4000 -KLD 80 -benchmark 1 -conditional 0 -expDirName "ResNet-64Chs-lr0.000085-L1L1-KLD80-420Z-BS4-AllVPNet-Depth"
 
 * th main.lua -testPhase 0 -batchSize 4 -nLatents 420 -rawDataType 'int' -zip 0 -fromScratch 0 -nCh 64 -maxEpochs 50 -sampleType 'interpolate' -nSamples 6 -lr 0.000085 -initialLR 0.000002 -lrDecay 0.98 -nReconstructions 30 -sampleOnly 0 -batchSizeChangeEpoch 20 -batchSizeChange 2 -targetBatchSize 8 -modelPath "" -var 1 -mean 0 -canvasHW 4 -tanh 0 -dropoutNet 0 -onlySilhouettes 1  -singleVPNet 0 -maxMemory 4000 -KLD 80 -benchmark 1 -conditional 0 -expDirName "ResNet-64Chs-lr0.000085-L1L1-KLD80-420Z-BS4-AllVPNet-Silhouette"
 
