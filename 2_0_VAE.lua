@@ -185,9 +185,9 @@ function VAE.get_encoder(modelParams)
     -- feature map size: 110 x 110
     encoder:add(residualBlock(basicblock, nOutputCh * 4, nOutputCh * 6, 1, 2, 'first'))
     -- feature map size: 53 x 53
-    encoder:add(residualBlock(basicblock, nOutputCh * 6, nOutputCh * 7, 1, 2))
+    encoder:add(residualBlock(basicblock, nOutputCh * 6, nOutputCh * 8, 1, 2))
     -- feature map size: 25 x 25
-    encoder:add(residualBlock(basicblock, nOutputCh * 7, nOutputCh * 6, 1, 2))
+    encoder:add(residualBlock(basicblock, nOutputCh * 8, nOutputCh * 6, 1, 2))
     -- feature map size: 11 x 11
     encoder:add(residualBlock(basicblock, nOutputCh * 6, nOutputCh, 1, 2))
     encoder:add(ShareGradInput(SpatialBatchNormalization(nOutputCh), 'last'))
@@ -219,7 +219,6 @@ function VAE.get_encoder(modelParams)
     if conditional then
         mean_logvar:add(nn.Sequential()
         :add(nn.Linear(nOutputCh * 4 * 4, nOutputCh * 4 * 3))
-        -- :add(nn.BatchNormalization(nOutputCh * 4 * 3))
         :add(nn.ReLU(true))
         :add(nn.Linear(nOutputCh * 4 * 3, numCats)))
     end

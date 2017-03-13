@@ -48,18 +48,18 @@ cmd:option('-nReconstructions', 50, 'An integer indicating how many reconstuctio
 cmd:option('-initialLR', 0.0000035, 'The learning rate to be used for the first few epochs of training')
 cmd:option('-lr', 0.000085, 'The learning rate: Any positive decimal value')
 cmd:option('-lrDecay', 0.97, 'The rate to aneal the learning rate')
-cmd:option('-maxEpochs', 60, 'The maximum number of epochs: Any positive real number')
+cmd:option('-maxEpochs', 50, 'The maximum number of epochs: Any positive real number')
 cmd:option('-dropoutNet', 0, 'Set to 1 to drop 15 to 18 views during training')
 cmd:option('-VpToKeep', 100, 'Drops all VPs except this one. The valid range is [0 ... opt.numVPs]. Set it to > opt.numVPs to ignore')
 cmd:option('-onlySilhouettes', 0, 'Indicates whether only the masks (silhouettes) must be used for training')
 cmd:option('-singleVPNet', 0, 'If set to 1, will perform random permutation on the input vector view point channels')
 cmd:option('-conditional', 0, 'Indicates whether the model is trained conditionally')
-cmd:option('-KLD', 80, 'The coefficient for the gradients of the KLD loss')
+cmd:option('-KLD', 75, 'The coefficient for the gradients of the KLD loss')
 -- Testing:
 cmd:option('-sampleOnly', 0, 'Load a pre-stored model and start getting sampling or do interpolation: 0 | 1')
 cmd:option('-modelPath', '', 'The path to load a model an start doing experiments with it: 0 | 1')
-cmd:option('-canvasHW', 6, 'Determines the canvas grid size on which the samples from the manifold will be shown')
-cmd:option('-nSamples', 6, 'The number of samples to be drawn from the prior (z)')
+cmd:option('-canvasHW', 5, 'Determines the height and width of the canvas on which the samples from the manifold will be shown on')
+cmd:option('-nSamples', 6, 'Number of samples to be drawn from the prior (z), for each category (if conditional) or otherwise in total')
 cmd:option('-sampleType', 'random', 'Determines the number of latent variables: data | random')
 cmd:option('-mean', 0, 'The mean on the z vector elements: Any real number')
 cmd:option('-var', 1, 'The variance of the z vector elements. In case sampleType = data then it indicates the ratio by which the predicted model variance will be multiplied by: Any positive real number')
@@ -85,7 +85,7 @@ if opt.dropoutNet == 1 then opt.dropoutNet = true opt.VpToKeep = opt.VpToKeep + 
 if opt.onlySilhouettes == 1 then opt.onlySilhouettes = true elseif opt.onlySilhouettes == 0 then opt.onlySilhouettes = false else print "==> Incorrect value for 'onlySilhouettes' argument" os.exit() end
 if opt.singleVPNet == 1 then opt.singleVPNet = true elseif opt.singleVPNet == 0 then opt.singleVPNet = false else print "==> Incorrect value for 'singleVPNet' argument" os.exit() end
 if opt.conditional == 1 then opt.conditional = true elseif opt.conditional == 0 then opt.conditional = false else print "==> Incorrect value for 'conditional' argument" os.exit() end
-if opt.batchSize < 2 then print '==> The batch size cannot be less than 3 for technical reasons' opt.batchSize = 2 end
+if opt.batchSize < 2 then print '==> The batch size cannot be less than 2 for technical reasons. Batch size was set to 2' opt.batchSize = 2 end
 if opt.sampleOnly == 0 then opt.sampleOnly = false elseif opt.sampleOnly == 1 then opt.sampleOnly = true else print "==> Incorrect value for the 'samplePhase' argument" os.exit() end
 if opt.experiment == 1 then opt.experiment = true if not opt.dropVPs then opt.VpToKeep = opt.VpToKeep + 1 end elseif opt.experiment == 0 then opt.experiment = false opt.expType = nil else print "==> Incorrect value for 'experiment' argument" os.exit() end
 

@@ -51,16 +51,16 @@ if not opt then
     cmd:option('-initialLR', 0.0000035, 'The learning rate to be used for the first few epochs of training')
     cmd:option('-lr', 0.000085, 'The learning rate: Any positive decimal value')
     cmd:option('-lrDecay', 0.97, 'The rate to aneal the learning rate')
-    cmd:option('-maxEpochs', 60, 'The maximum number of epochs')
+    cmd:option('-maxEpochs', 50, 'The maximum number of epochs')
     cmd:option('-dropoutNet', 0, 'Set to 1 to drop 15 to 18 views during training')
     cmd:option('-VpToKeep', 100, 'Drops all VPs except this one. The valid range is [0 ... opt.numVPs]. Set it to > opt.numVPs to ignore')
     cmd:option('-onlySilhouettes', 0, 'Indicates whether only the silhouettes must be used for training')
     cmd:option('-singleVPNet', 0, 'If set to 1, will perform random permutation on the input vector view point channels')
     cmd:option('-conditional', 0, 'Indicates whether the model is trained conditionally')
-    cmd:option('-KLD', 80, 'The coefficient for the gradients of the KLD loss')
+    cmd:option('-KLD', 75, 'The coefficient for the gradients of the KLD loss')
     -- Testing
-    cmd:option('-canvasHW', 15, 'Determines the height and width of the canvas on which the samples from the manifold will be drawn: Any positive integer number')
-    cmd:option('-nSamples', 15, 'The number of samples to be drawn from the prior (z): Any positive integer number')
+    cmd:option('-canvasHW', 5, 'Determines the height and width of the canvas on which the samples from the manifold will be shown on')
+    cmd:option('-nSamples', 6, 'Number of samples to be drawn from the prior (z), for each category (if conditional) or otherwise in total')
     cmd:option('-sampleType', 'random', 'Determines the number of latent variables: data | interpolate | random')
     cmd:option('-sampleCategory', '', "The category name from which one would like to start generating samples. Will be used if opt.sampleType == 'data': A valid category name for which there are examples in the train data set")
     cmd:option('-mean', 0, 'The mean on the z vector elements: Any real number')
@@ -77,7 +77,7 @@ if not opt then
     if opt.onlySilhouettes == 1 then opt.onlySilhouettes = true elseif opt.onlySilhouettes == 0 then opt.onlySilhouettes = false else print "==> Incorrect value for 'onlySilhouettes' argument" os.exit() end
     if opt.singleVPNet == 1 then opt.singleVPNet = true elseif opt.singleVPNet == 0 then opt.singleVPNet = false else print "==> Incorrect value for 'singleVPNet' argument" os.exit() end
     if opt.conditional == 1 then opt.conditional = true elseif opt.conditional == 0 then opt.conditional = false else print "==> Incorrect value for 'conditional' argument" os.exit() end
-    if opt.batchSize < 2 then print '==> The batch size cannot be less than 3 for technical reasons' opt.batchSize = 2 end
+    if opt.batchSize < 2 then print '==> The batch size cannot be less than 2 for technical reasons. Batch size was set to 2' opt.batchSize = 2 end
 
     -- Set the default data type for Torch
     if opt.globalDataType == 'float' then torch.setdefaulttensortype('torch.FloatTensor') dataTypeNumBytes = 4
@@ -222,8 +222,8 @@ if trainDataFiles then -- If there are training files on disk
     }
     local state = {}
 
-    print ("==> Number of Model Parameters: " .. parameters:nElement())
     print ''
+    print ("==> Number of Model Parameters: " .. parameters:nElement())
     while continueTraining and epoch <= opt.maxEpochs do
 
         local totalError = 0
@@ -679,7 +679,7 @@ if trainDataFiles then -- If there are training files on disk
         -- Save the model and parameters
         local handle = assert(io.popen(string.format('mkdir -p %s/save-Latents_%d-BS_%d-Ch_%d-lr_%.5f/epoch%d', opt.expDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr, epoch)))
         handle:close()
-        if continueTraining and epoch >= 14 and epoch % 2 == 0 then
+        if continueTraining and epoch >= 16 and epoch % 2 == 0 then
             state.v = state.v:float()
             state.m = state.m:float()
             state.denom = state.denom:float()
@@ -705,8 +705,8 @@ if trainDataFiles then -- If there are training files on disk
             collectgarbage()
         end
 
-        -- Sample the manifold
-        if continueTraining and epoch >= 42 and epoch % 2 == 0 then
+        -- Sample [or do interpolation on] the learned manifold
+        if continueTraining and epoch >= 26 and epoch % 2 == 0 then
             print ('==> Doing sampling/interpolation with the model. Configs: Type -- ' .. opt.sampleType .. ', Number of Samples: ' .. opt.nSamples .. ', Canvas Size: ' .. opt.canvasHW .. ' x ' .. opt.canvasHW .. ', Mean: ' .. opt.mean .. ', Variance: ' .. opt.var)
             local samplesPath = string.format(paths.cwd() .. '/%s/images-Latents_%d-BS_%d-Ch_%d-lr_%.5f/epoch%d/manifold',opt.expDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr, epoch)
             sampleManifold.sample(opt.sampleType, opt.sampleCategory, opt.canvasHW, opt.nSamples, data, modelTest, '', samplesPath, opt.mean, opt.var, opt.nLatents, opt.imgSize, opt.numVPs, epoch, opt.batchSize, opt.targetBatchSize, false, opt.testPhase, opt.tanh, opt.dropoutNet, opt.VpToKeep, opt.onlySilhouettes, sampleZembeddings, opt.singleVPNet, opt.conditional, nil, opt.benchmark)
