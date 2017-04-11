@@ -62,7 +62,7 @@ function commonFuncs.findFiles(folderPath, fileType)
 	return filesPath, fileNames
 end
 
-function commonFuncs.randPermTableContents(table)
+function commonFuncs.randPermTableElements(table)
 	--[[
 	Randomly permutes the elements of a table.
 
@@ -102,109 +102,9 @@ function commonFuncs.getFreeMemory(ratio)
 	return (freeMem - leaveFreeMem) < opt.maxMemory and (freeMem - leaveFreeMem) or opt.maxMemory
 end
 
-function commonFuncs.memoryPerSampleImage(imgSize, dataTypeNumBytes)
-	
-	-- Computes how much memory (in MBs) will be required for one of the images in the data set
-
-	local totalSizeOnMem = 0 -- In MBs
-	if imgSize:size() == 3 then
-		totalSizeOnMem = imgSize[2] * imgSize[3] * dataTypeNumBytes / 1024 / 1024		
-	elseif imgSize:size() == 2 then
-		totalSizeOnMem = imgSize[1] * imgSize[2] * dataTypeNumBytes / 1024 / 1024
-	else
-		totalSizeOnMem = imgSize() * dataTypeNumBytes  / 1024 / 1024
-	end
-
-	return totalSizeOnMem
-end
 
 function commonFuncs.getGPUMem()
-	--[[
-		Returns the amount of free and total available memory on the GPU, in MBs
-	--]]
-
-	if cutorch then
-		return ({cutorch.getMemoryUsage()})[1] / 1024 / 1024, ({cutorch.getMemoryUsage()})[2] / 1024 / 1024
-	else
-		return 0, 0
-	end
-end
-
-function commonFuncs.resizeImages(originalImages, newImgSize, numVPs)
-	--[[
-		Resizes the images in data.dataset to a new image size
-		The assumption is the images are square-shaped (e.g. 120 x 120)
-
-
-		Inputs:
-		images: A tensor containing images with size M x L where M is the number of examples and L contains or or more numbers. (e.g. 760 x [20 x 128 x 128]. Here each images of size 128 x 128 has 20 channels (view points))
-			Note that the function can deal with images of the following formats:
-			M x [numVPs x 3 x imgSize x imgSize]
-			M x [numVPs x imgSize x imgSize]
-			M x [numVPs * imgSize * imgSize] (flattened image)
-		newImgSize: A single number containing the new image size
-		numVPs: The number of view points for the 3D models
-
-		newImages: The resized images of originalImages
-	--]]
-	
-	if not image then require 'image' end
-	local originalImgSize = {}
-	local newImages
-
-
-	if originalImages[1]:size(1) == 1 then -- Each example in originalImages tensor has size 'L' where 'L' is a single number (opt.modelType = 'fc'). E.g. the tensor size is 2000 x [288000]
-
-		local imgSize = originalImages[1]:size(1) / numVPs
-		originalImgSize[1] = numVPs
-		originalImgSize[2] = math.sqrt(imgSize)
-		originalImgSize[3] = math.sqrt(imgSize)
-		originalImages = originalImages:reshape(torch.LongStorage(commonFuncs.tableConcat({originalImages:size(1)}, originalImgSize))) -- Change all the images back to the original shape
-		newImages = torch.Tensor(torch.LongStorage(commonFuncs.tableConcat({originalImages:size(1)}, {numVPs * newImgSize * newImgSize})))
-		for i=1, originalImages:size(1) do
-			-- local tempImg = originalImages[i]:reshape(torch.LongStorage(originalImgSize)) 
-			local tempImgNew = torch.Tensor(torch.LongStorage(commonFuncs.tableConcat({numVPs}, {newImgSize, newImgSize})))
-			for j=1, numVPs do
-				tempImgNew[j] = image.scale(originalImages[i][j], newImgSize, newImgSize)
-			end
-			newImages[i] = tempImgNew:reshape(numVPs * newImgSize * newImgSize)
-			tempImgNew = nil
-			if i % 140 == 0 then collectgarbage() end
-		end
-
-	elseif originalImages[1]:size(1) == 3  then -- The originalImages tensor size is 2000 x [20 x 120 x 120] where 20 is numVPs
-
-		newImages = torch.Tensor(torch.LongStorage(commonFuncs.tableConcat({originalImages:size(1)}, {originalImages[1]:size(1), newImgSize, newImgSize})))
-		for i=1, originalImages:size(1) do
-			local tempImgNew = torch.Tensor(torch.LongStorage({numVPs, newImgSize, newImgSize}))
-			for j=1, numVPs do
-				tempImgNew[j] = image.scale(originalImages[i][j], newImgSize, newImgSize)
-			end
-			newImages[i] = tempImgNew
-			tempImgNew = nil
-			if i % 140 == 0 then collectgarbage() end
-		end
-	elseif originalImages[1]:size(1) == 4 then -- The originalImages tensor size is 2000 x [20 x 3 x 120 x 120] where 20 is numVPs and each view point has 3 channels
-
-		newImages = torch.Tensor(torch.LongStorage(commonFuncs.tableConcat({originalImages:size(1)}, {originalImages[1]:size(1), originalImages[1]:size(2), newImgSize, newImgSize})))
-		for i=1, originalImages:size(1) do
-			local tempImgNew = torch.Tensor(torch.LongStorage({numVPs, originalImages[1]:size(2), newImgSize, newImgSize}))
-			for j=1, numVPs do
-				for k=1, tempImgNew:size(2) do
-					tempImgNew[j][k] = image.scale(originalImages[i][j][k], newImgSize, newImgSize)
-				end
-			end
-			newImages[i] = tempImgNew
-			tempImgNew = nil
-			if i % 140 == 0 then collectgarbage() end
-		end
-	end
-
-	originalImgType = originalImages[1]:type()
-	originalImages = nil
-	collectgarbage()
-	return newImages:type(originalImgType)
-
+	return ({cutorch.getMemoryUsage()})[1] / 1024 / 1024, ({cutorch.getMemoryUsage()})[2] / 1024 / 1024
 end
 
 function commonFuncs.getFileSize(file)
@@ -448,12 +348,12 @@ end
 function commonFuncs.dropInputVPs(inputTensor, VpToKeep, markInputDepthAndMask, numDropVPs, dropIndices, singleVPNet, pickedVPs, conditionHotVec)
 	-- Takes a tensor of size M x numVPs x originalImgSize x originalImgSize as input and randomly zeros-out 15-18 of the sub-tensors on dimension two
 	-- In case inputTensor was a table, the first entry contains depth images and the second one the silhouettes
-	-- if markInputDepthAndMask == true then the view points of the original inputTensor will be marked by a small white square 
-	-- Only set markInputDepthAndMask = true when not doing training or validaion and only if you want to store the dropped input data on disk
+	-- if markInputDepthAndMask == true then the view points of the original depth maps and silhouettes will be marked by a small white square on their top-right corners
+	-- Only set markInputDepthAndMask to 'true' when not doing training or validaion and only if you want to store the dropped input data on disk
 
 	local droppedDepthTensor = type(inputTensor) ~= 'table' and inputTensor:clone() or inputTensor[1]:clone()
-	local droppedMaskTensor
-	if type(inputTensor) == 'table' then droppedMaskTensor = inputTensor[2]:clone() end
+	local droppedSilhouettesTensor
+	if type(inputTensor) == 'table' then droppedSilhouettesTensor = inputTensor[2]:clone() end
 	local numVPs = droppedDepthTensor:size(2)
 
 	-- VpToKeep is either between [0-19] or is an invalid number ( > 19 )
@@ -470,7 +370,7 @@ function commonFuncs.dropInputVPs(inputTensor, VpToKeep, markInputDepthAndMask, 
 			for j=1, numDropVPs[1] do
 				droppedDepthTensor[i][dropIndices[j]]:zero()
 				if type(inputTensor) == 'table' then
-					droppedMaskTensor[i][dropIndices[j]]:zero()
+					droppedSilhouettesTensor[i][dropIndices[j]]:zero()
 				end
 				if markInputDepthAndMask then
 					if type(inputTensor) ~= 'table' then
@@ -514,21 +414,21 @@ function commonFuncs.dropInputVPs(inputTensor, VpToKeep, markInputDepthAndMask, 
 
 		if type(inputTensor) == 'table' then
 			if not singleVPNet then
-				tempMaskVP = droppedMaskTensor[{{}, {VpToKeep}}]:clone()
+				tempMaskVP = droppedSilhouettesTensor[{{}, {VpToKeep}}]:clone()
 			else
 				tempMaskVP = torch.zeros(droppedDepthTensor:size(1), 1, droppedDepthTensor:size(3), droppedDepthTensor:size(4)):type(droppedDepthTensor:type())
 				local pickVP
 				for i=1, droppedDepthTensor:size(1) do
 					pickVP = not flag and pickedVPs[i] or pickedVPs[1]
-					tempMaskVP[{{i}, {1}}] = droppedMaskTensor[{i, {pickVP}}]:clone()
+					tempMaskVP[{{i}, {1}}] = droppedSilhouettesTensor[{i, {pickVP}}]:clone()
 				end
 			end
 			if singleVPNet then
-				droppedMaskTensor = torch.Tensor(droppedMaskTensor:size(1), 1, droppedMaskTensor:size(3), droppedMaskTensor:size(4)):type(droppedMaskTensor:type())
+				droppedSilhouettesTensor = torch.Tensor(droppedSilhouettesTensor:size(1), 1, droppedSilhouettesTensor:size(3), droppedSilhouettesTensor:size(4)):type(droppedSilhouettesTensor:type())
 			else
-				droppedMaskTensor:zero()
+				droppedSilhouettesTensor:zero()
 			end
-			droppedMaskTensor[{{}, {VpToKeep}}]:copy(tempMaskVP)
+			droppedSilhouettesTensor[{{}, {VpToKeep}}]:copy(tempMaskVP)
 			tempMaskVP = nil
 		end
 		
@@ -587,9 +487,9 @@ function commonFuncs.dropInputVPs(inputTensor, VpToKeep, markInputDepthAndMask, 
 		end
 	else
 		if conditionHotVec then
-			return {droppedDepthTensor, droppedMaskTensor, conditionHotVec}
+			return {droppedDepthTensor, droppedSilhouettesTensor, conditionHotVec}
 		else
-			return {droppedDepthTensor, droppedMaskTensor}
+			return {droppedDepthTensor, droppedSilhouettesTensor}
 		end
 	end
 end
@@ -611,45 +511,10 @@ function commonFuncs.combineMeanLogVarTensors(meansTable, log_varsTable, labelsT
 	return {meansTensor, log_varsTensor, labelsTensor}
 end
 
-function commonFuncs.permuteVPs(inputTensor, inPlace, permute)
-	-- Permutes the view points of a tensor with size M x ViewPoint x I x I
-
-	local returnTensor
-	if permute and permute == true then
-		if not inPlace then
-			if type(inputTensor) ~= 'table' then
-				returnTensor = inputTensor:clone()
-			else
-				returnTensor = {}
-				for i=1, #inputTensor do
-					returnTensor[i] = inputTensor[i]:clone()
-				end
-			end
-		else
-			returnTensor = inputTensor
-		end
-		if type(returnTensor) ~= 'table' then
-			for i=1, returnTensor:size(1) do
-				permuteIndices = torch.randperm(returnTensor[{{i}}]:size(2)):long()
-				returnTensor[{{i}}] = returnTensor[{{i}}]:index(2, permuteIndices)
-			end
-		else
-			for i=1, #returnTensor do
-				for j=1, returnTensor[i]:size(1) do
-					permuteIndices = torch.randperm(returnTensor[i][{{j}}]:size(2)):long()
-					returnTensor[i][{{j}}] = returnTensor[i][{{j}}]:index(2, permuteIndices)
-				end
-			end
-		end
-		return returnTensor
-	else
-		return inputTensor
-	end
-end
-
 function commonFuncs.computeClassificationAccuracy(predictedScores, targetClassVec, returnHotVec, numCats)
-	-- Computes the raw classification accuracy score. Eventually, the user should divide the sum of the
+	-- Computes the raw classification accuracy score. Eventually, the user should divide the returned number by total number of samples
 	-- if returnHotVec == false then divide the numbers returned b the function by batch size
+	-- In case targetClassVec is not provided the function will return a hot-vector version of the predictedScores vector
 
 	local predScores = predictedScores:clone():float()
 	local targetClass = targetClassVec and targetClassVec:clone():float() or nil
@@ -683,12 +548,13 @@ function commonFuncs.numOfDirs(thePath)
 	return #folderNames-2
 end
 
-function commonFuncs.getFileNames(thePath, lookUpStr)
+function commonFuncs.getFileNames(thePath, lookUpStr, concatWithOrigPath)
 	-- Returns the file names in a directory
 
-	local handle = assert(io.popen('ls -1v ' .. thePath)) 
+	if concatWithOrigPath == nil then concatWithOrigPath = true end
+	local handle = assert(io.popen('ls -1v ' .. thePath .. ' | grep -v ~$')) 
 	local allFileNames = string.split(assert(handle:read('*a')), '\n')
-	for i=1, #allFileNames do if not lookUpStr then allFileNames[i] = paths.cwd() .. '/' .. thePath .. '/' .. allFileNames[i] else allFileNames[i] = thePath .. '/' .. allFileNames[i] end end
+	for i=1, #allFileNames do if not lookUpStr then allFileNames[i] = (concatWithOrigPath and paths.cwd() .. '/' or '') .. thePath .. '/' .. allFileNames[i] else allFileNames[i] = thePath .. '/' .. allFileNames[i] end end
 	if lookUpStr then
 		local tempAllFileNames = {}
 		for i=1, #allFileNames do if allFileNames[i]:find(lookUpStr) then table.insert(tempAllFileNames, allFileNames[i]) end end
@@ -705,7 +571,7 @@ function commonFuncs.loadExtraData(path, forwardType, numVPs)
 	local silTensor, depthTensor, rgbTensor
 	local filePaths = commonFuncs.getFileNames(path)
 	local imgSize = image.load(filePaths[1]):size(3)
-	if forwardType == 'silhouettes' then
+	if forwardType == 'userData' then
 		silTensor = torch.zeros(#filePaths, 1, imgSize, imgSize)
 		local temp = silTensor:gt(0.12)
 		silTensor[silTensor:lt(0.12)] = 1
@@ -731,10 +597,6 @@ function commonFuncs.loadExtraData(path, forwardType, numVPs)
 			depthTensor[math.ceil(i/numVPs)][(i%numVPs) ~=0 and (i%numVPs) or numVPs] = image.load(filePaths[i], 1)
 		end
 		return depthTensor
-		-- elseif forwardType == 'NNs' then
-		-- 	local filePaths = commonFuncs.getFileNames(path)
-
-		-- end
 	end
 end
 
@@ -752,36 +614,36 @@ function commonFuncs.loadDepthImagesIntoTensors(paths, strToLookup, numVPs)
 
 end
 
-function commonFuncs.getEncodings(inputTensor, encoderModel, sampler, silhouettes, onlySilhouettes)
+function commonFuncs.getEncodings(inputTensor, encoderModel, sampler, conditional)
 	inputTensor = torch.cat(inputTensor, inputTensor, 1)
 	inputTensor = inputTensor:cuda()
-	-- local maskInputs = inputTensor:clone()
-	-- maskInputs[maskInputs:gt(0)] = 1
-
-	-- if onlySilhouettes then
-	-- 	inputTensor = nil
-	-- 	inputTensor = maskInputs
-	-- elseif silhouettes then
-	-- 	inputTensor = {inputTensor, maskInputs}
-	-- end
 
 	local encodedSample = encoderModel:forward(inputTensor)
-	local Z = sampler:forward(encodedSample)[{{1}}]
-	for i=1, 4 do
-		Z = torch.cat(Z, sampler:forward(encodedSample)[{{1}}], 1)
+	if conditional then
+		predictedClassScores = encodedSample[3]
 	end
-	Z = Z:mean(1)
-
+	encodedSample = torch.cat(encodedSample[1][{{1}}], encodedSample[2][{{1}}], 2)
 	inputTensor = nil
-	maskInputs = nil
+	return conditional and {encodedSample, predictedClassScores} or {encodedSample}
 
-	return Z
+	-- if conditional then
+	-- 	encodedSample = {encodedSample[1], encodedSample[2]}
+	-- end
+	-- local Z = sampler:forward(encodedSample)[{{1}}]
+	-- for i=1, 4 do
+	-- 	Z = torch.cat(Z, sampler:forward(encodedSample)[{{1}}], 1)
+	-- end
+	-- Z = Z:mean(1)
+
+	-- inputTensor = nil
+
+	-- return Z
 end
 
 function commonFuncs.getNumOfSamplesToViz(allSamplesPath)
 	local numOfSamples = 0
 	for i=1, #allSamplesPath do
-		local samplesToVisualize = commonFuncs.getFileNames(allSamplesPath[i], 'viz.txt')
+		local samplesToVisualize = commonFuncs.getFileNames(allSamplesPath[i], "viz.txt")
 		if #samplesToVisualize == 1 then
 			f = assert(io.open(samplesToVisualize[1], 'r'))
 			for line in f:lines() do
@@ -810,7 +672,6 @@ end
 
 
 function commonFuncs.show_scatter_plot(method, mapped_x, labels, numCats, categories, exportDir)
-	require 'gnuplot'
 
    -- count label sizes:
    local K = numCats
@@ -821,7 +682,7 @@ function commonFuncs.show_scatter_plot(method, mapped_x, labels, numCats, catego
 
    -- separate mapped data per label:
    mapped_data = {}
-   for k = 1,K do
+   for k = 1, K do
       mapped_data[k] = {categories[k], torch.Tensor(cnts[k], 2), '+'}
    end
    local offset = torch.Tensor(K):fill(1)
@@ -852,20 +713,16 @@ function commonFuncs.show_scatter_plot(method, mapped_x, labels, numCats, catego
    gnuplot.plotflush()
 end
 
-function commonFuncs.findEligibleCatsIndices(data)
-	-- data.labels is the integer labels
-	-- data.category is the categories/class names
-
-	local cats = torch.Tensor(1)
-	for i=1, #data.category do cats = torch.cat(cats, torch.Tensor(1):fill(0), 1) end
-	cats = cats[{{2, cats:size(1)}}]
-	for i=1, data.labels:size(1) do cats[data.labels[i]] = cats[data.labels[i]] + 1 end
-	local eligibleDataIndices = torch.Tensor(1)
-	for i=1, data.labels:size(1) do if cats[data.labels[i]] > 20 then eligibleDataIndices = torch.cat(eligibleDataIndices, torch.Tensor(1):fill(i), 1) end end
-	eligibleDataIndices = eligibleDataIndices[{{2, eligibleDataIndices:size(1)}}]:long()
-
-	return eligibleDataIndices
-
+function commonFuncs.splitTxt(inputStr, sep)
+        if sep == nil then
+                sep = "%s"
+        end
+        local t={} ; i=1
+        for str in string.gmatch(inputStr, "([^".. sep .."]+)") do
+                t[i] = str
+                i = i + 1
+        end
+        return t
 end
 
 return commonFuncs

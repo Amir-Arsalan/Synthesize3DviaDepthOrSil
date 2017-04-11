@@ -18,7 +18,7 @@ How to process the data:
 - Each directory contains files with patterns as follow: (%a+_%d+_%a+_%d*.[png/txt]). E.g. model_000043_Cam_0.[png/txt]. In our experiments we have 20 view points so the file names for each 3D model have Cam_0 to Cam_19 in their names.
 - The option opt.rawDataType determines whether to process the .txt (float) or png (int) files. Set opt.rawDataType to 'float' and 'int' to read .txt or .png files respectively
 
-How to process unbenchmark data
+How to process nonbenchmark data
 - Create a directory named "Data" in the cloned repository's directory
 - If you are working with your own data create a directory named "nonbenchmark" in /Data
 - Copy your .zip files in "nonbenchmark"
@@ -47,7 +47,7 @@ if not opt then
 	cmd:text('Options:')
 	-- Global
 	cmd:option('-globalDataType', 'float', 'Sets the default data type for Torch tensors: float, double')
-	cmd:option('-maxMemory', 3000, 'The maximum amount of memory (in MBs) to be used for creating the training/validation and test files: Any positive real number')
+	cmd:option('-maxMemory', 5000, 'The maximum amount of memory (in MBs) to be used for creating the training/test files')
 	-- Data reading/storing:
 	cmd:option('-zip', 0, 'Whether the data should be read from the zip files or from what already is in /Data already: 0 | 1')
 	cmd:option('-rawDataType', 'int', 'Determines the type of data files to be read: int (.png files) | float (.txt files)')
@@ -375,10 +375,10 @@ local benchmarkFolders = {'/train', '/test'}
 local data = {} -- Holds the information for data sets of each class
 for t = 1, (not opt.benchmark or (not opt.zip and not opt.fromScratch)) and 1 or 2 do
 	if opt.benchmark and t == 1 then
-		print ('==> Processing the benchmark data set to create the training set tensor files')
+		print ('==> Processing the benchmark data set to create and store the training set tensor files')
 		print ''
 	elseif t == 2 then
-		print ('==> Processing the benchmark data set to create the validation/test set tensor files')
+		print ('==> Processing the benchmark data set to create and store the validation/test set tensor files')
 		print ''
 	end
 	local dataFolderPath = paths.cwd() .. rawDataFolder

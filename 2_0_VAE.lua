@@ -182,34 +182,16 @@ function VAE.get_encoder(modelParams)
 
 
     -- Dilated Convolution
-    -- feature map size: 110 x 110
+    -- Output feature map size: 110 x 110
     encoder:add(residualBlock(basicblock, nOutputCh * 4, nOutputCh * 6, 1, 2, 'first'))
-    -- feature map size: 53 x 53
+    -- Output feature map size: 53 x 53
     encoder:add(residualBlock(basicblock, nOutputCh * 6, nOutputCh * 8, 1, 2))
-    -- feature map size: 25 x 25
+    -- Output feature map size: 25 x 25
     encoder:add(residualBlock(basicblock, nOutputCh * 8, nOutputCh * 6, 1, 2))
-    -- feature map size: 11 x 11
+    -- Output feature map size: 11 x 11
     encoder:add(residualBlock(basicblock, nOutputCh * 6, nOutputCh, 1, 2))
     encoder:add(ShareGradInput(SpatialBatchNormalization(nOutputCh), 'last'))
-    -- feature map size: 4 x 4
-
-
-    -- Normal Convolution
-
-    -- -- Replace "SpatialDilatedConvolution" with "SpatialConvolution"
-    -- -- in this file to be able to use normal convolution
-    -- -- feature map size: 112 x 112
-    -- encoder:add(residualBlock(basicblock, nOutputCh * 4, nOutputCh * 6, 1, 2, 'first'))
-    -- -- feature map size: 56 x 56
-    -- encoder:add(residualBlock(basicblock, nOutputCh * 6, nOutputCh * 7, 1, 2))
-    -- -- feature map size: 28 x 28
-    -- encoder:add(residualBlock(basicblock, nOutputCh * 7, nOutputCh * 8, 1, 2))
-    -- -- feature map size: 14 x 14
-    -- encoder:add(residualBlock(basicblock, nOutputCh * 8, nOutputCh * 6, 1, 2))
-    -- -- feature map size: 7 x 7
-    -- encoder:add(residualBlock(basicblock, nOutputCh * 6, nOutputCh, 1))
-    -- encoder:add(ShareGradInput(SpatialBatchNormalization(nOutputCh), 'last'))
-    -- -- feature map size: 4 x 4
+    -- Output feature map size: 4 x 4
 
 
     encoder:add(nn.View(nOutputCh * 4 * 4))
@@ -218,9 +200,9 @@ function VAE.get_encoder(modelParams)
     mean_logvar:add(nn.Linear(nOutputCh * 4 * 4, nLatents)) -- Log of the variances
     if conditional then
         mean_logvar:add(nn.Sequential()
-        :add(nn.Linear(nOutputCh * 4 * 4, nOutputCh * 4 * 3))
+        :add(nn.Linear(nOutputCh * 4 * 4, (nOutputCh * 4 * 4) - 50))
         :add(nn.ReLU(true))
-        :add(nn.Linear(nOutputCh * 4 * 3, numCats)))
+        :add(nn.Linear((nOutputCh * 4 * 4) - 50, numCats)))
     end
     encoder:add(mean_logvar)
 
@@ -248,22 +230,22 @@ function VAE.get_decoder(modelParams)
     decoder:add(nn.Linear(nLatents+numCats, nOutputCh * 2 * 4 * 4))
     decoder:add(nn.View(nOutputCh * 2 , 4, 4))
     decoder:add(SpatialBatchNormalization(nOutputCh * 2)):add(nn.ReLU(true))
-    -- feature map size: 4 x 4
+    -- Output feature map size: 4 x 4
     decoder:add(residualBlock(basicblock, nOutputCh * 2, nOutputCh * 6,  1, nil, 'first', true))
-    -- feature map size: 7 x 7
+    -- Output feature map size: 7 x 7
     decoder:add(residualBlock(basicblock, nOutputCh * 6, nOutputCh * 8,  1, 2, nil, true))
-    -- feature map size: 14 x 14
+    -- Output feature map size: 14 x 14
     decoder:add(residualBlock(basicblock, nOutputCh * 8, nOutputCh * 7,  1, 2, nil, true))
     decoder:add(ShareGradInput(SpatialBatchNormalization(nOutputCh * 7), 'last'))
-    -- feature map size: 28 x 28
+    -- Output feature map size: 28 x 28
 
     decoder:add(SpatialFullConvolution(nOutputCh * 7, nOutputCh * 6, 4, 4, 2, 2, 1, 1))
     decoder:add(SpatialBatchNormalization(nOutputCh * 6)):add(nn.ReLU(true))
-    -- feature map size: 56 x 56
+    -- Output feature map size: 56 x 56
 
     decoder:add(SpatialFullConvolution(nOutputCh * 6, nOutputCh * 4, 4, 4, 2, 2, 1, 1))
     decoder:add(SpatialBatchNormalization(nOutputCh * 4)):add(nn.ReLU(true))
-    -- feature map size: 112 x 112
+    -- Output feature map size: 112 x 112
 
     -- temoDeconvLayer1 generates the depth maps
     tempDeconvLayer1 = nn.Sequential():add(SpatialFullConvolution(nOutputCh * 4, nInputCh, 4, 4, 2, 2, 1, 1))
@@ -275,7 +257,7 @@ function VAE.get_decoder(modelParams)
     -- temoDeconvLayer2 generates the silhouettes
     tempDeconvLayer2 = nn.Sequential():add(SpatialFullConvolution(nOutputCh * 4, nInputCh, 4, 4, 2, 2, 1, 1)):add(nn.Sigmoid())
     decoder:add(nn.ConcatTable():add(tempDeconvLayer1):add(tempDeconvLayer2))
-    -- feature map size: 224 x 224
+    -- Output feature map size: 224 x 224
 
     decoder:apply(weights_init)
     decoder:apply(function(m) if torch.type(m):find('Convolution') then m.bias:zero() end end)
