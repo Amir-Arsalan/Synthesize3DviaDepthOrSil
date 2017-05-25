@@ -544,33 +544,39 @@ function commonFuncs.getFileNames(thePath, lookUpStr, concatWithOrigPath)
 end
 
 
-function commonFuncs.loadExtraData(path, forwardType, numVPs)
+function commonFuncs.loadExtraData(path, forwardType, numVPs, silhouetteInput)
 
-	local imagesTensor, depthTensor, rgbTensor
+	local imagesTensor, silTensor, depthTensor, rgbTensor
 	local filePaths = commonFuncs.getFileNames(path)
 	local imgSize = image.load(filePaths[1]):size(3)
 	if forwardType == 'userData' then
 		imagesTensor = torch.Tensor(#filePaths, 1, imgSize, imgSize)
 		for i=1, #filePaths do
-			local tempImg = image.load(filePaths[i], 1)
-			tempImg[tempImg:gt(0)] = 1
-			imagesTensor[i]:copy(tempImg)
+			local tempImg = image.load(filePaths[i])
+			if silhouetteInput then
+				tempImg[1][tempImg[1]:lt(0.99)] = 0.99
+				tempImg[1][tempImg[2]:lt(0.99)] = 0.99
+				tempImg[1][tempImg[3]:lt(0.99)] = 0.99
+
+				tempImg[1][tempImg[1]:eq(1)] = 0
+				tempImg[1][tempImg[2]:eq(1)] = 0
+				tempImg[1][tempImg[3]:eq(1)] = 0
+			end
+			imagesTensor[i]:copy(tempImg[1]) -- If the inputs are depth maps, make sure the depth maps are in fact the first channel of the loaded images
 		end
-		-- local temp = imagesTensor:gt(0.12)
-		-- imagesTensor[imagesTensor:lt(0.12)] = 1
-		-- imagesTensor[temp] = 0
 		return imagesTensor
 	elseif forwardType == 'nyud' then
-		imagesTensor = torch.Tensor(#filePaths/3, 1, imgSize, imgSize)
+		silTensor = torch.Tensor(#filePaths/3, 1, imgSize, imgSize)
 		depthTensor = torch.Tensor(#filePaths/3, 1, imgSize, imgSize)
 		rgbTensor = torch.Tensor(#filePaths/3, 3, imgSize, imgSize)
 		for i=1, #filePaths/3 do
 			local tempSil = image.load(filePaths[3*(i-1)+2], 1)
 
 			depthTensor[i][1] = image.load(filePaths[3*(i-1)+1], 1)[{{1, 224}, {1, 224}}]
-			imagesTensor[i][1]:copy(tempSil:size():size(1) == 3 and tempSil[1][{{1, 224}, {1, 224}}] or tempSil[{{1, 224}, {1, 224}}])
+			silTensor[i][1]:copy(tempSil:size():size(1) == 3 and tempSil[1][{{1, 224}, {1, 224}}] or tempSil[{{1, 224}, {1, 224}}])
 			rgbTensor[i] = image.load(filePaths[3*(i-1)+3])[{{}, {1, 224}, {1, 224}}]
 		end
+		return {depthTensor, silTensor, rgbTensor}
 	end
 end
 
