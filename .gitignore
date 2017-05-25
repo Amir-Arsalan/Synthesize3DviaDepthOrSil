@@ -1,5 +1,4 @@
-/images*
-/save*
-*.png
-*.~
+/results*
+/model*
+*.*~
 *.t7
