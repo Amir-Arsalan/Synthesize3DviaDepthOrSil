@@ -47,16 +47,15 @@ if not opt then
 	cmd:text('Options:')
 	-- Global
 	cmd:option('-globalDataType', 'float', 'Sets the default data type for Torch tensors: float, double')
-	cmd:option('-maxMemory', 5000, 'The maximum amount of memory (in MBs) to be used for creating the training/test files')
 	-- Data reading/storing:
-	cmd:option('-zip', 0, 'Whether the data should be read from the zip files or from what already is in /Data already: 0 | 1')
+	cmd:option('-maxMemory', 3000, 'The maximum amount of memory (in MBs) to be used for creating the training/test tensor files')
+	cmd:option('-zip', 0, 'Indicates whether the data set the zip files should be first extracted: 0 | 1')
+	cmd:option('-fromScratch', 0, "Redo the processes of storing the images into torch tensors and saving them on disk, without extracting the zip files: 0 | 1")
 	cmd:option('-rawDataType', 'int', 'Determines the type of data files to be read: int (.png files) | float (.txt files)')
 	cmd:option('-depthMap', 1, 'Indicates whether the data set images are depth map or not: 1 | 0')
 	cmd:option('-pTrain', 0.925, 'How much, in percentage, of the data will be used for training: (0, 1)')
 	cmd:option('-pValid', 0.045, 'How much, in percentage, of the data will be used for validation (0, 1)')
 	cmd:option('-pTest', 0.03, 'How much, in percentage, of the data will be used for testing (0, 1)')
-	cmd:option('-randPerm', 1, 'Whether the data set must be shuffled before training or not?: 0 | 1')
-	cmd:option('-fromScratch', 0, "Redo the entire data preparation process: 0 | 1")
 	cmd:option('-resizeScale', 1, "The resize ratio for the input data: (0, 1]")
 	cmd:option('-imgSize', 224, '3D grid size. E.g. 224')
 	cmd:option('-numVPs', 20, 'Number of view points for the 3D models')
@@ -66,7 +65,6 @@ if not opt then
 
 	if opt.zip == 1 then opt.zip = true elseif opt.zip == 0 then opt.zip = false else print "==> Incorrect value for zip argument. Acceptables: 0 or 1" os.exit() end
 	if opt.depthMap == 1 then opt.depthMap = true elseif opt.depthMap == 0 then opt.depthMap = false else print "==> Incorrect value for depthMap argument. Acceptables: 0 or 1" os.exit() end
-	if opt.randPerm == 1 then opt.randPerm = true elseif opt.randPerm == 0 then	opt.randPerm = false else print "==> Incorrect value for randPerm argument. Acceptables: 0 or 1" os.exit() end
 	if opt.fromScratch == 1 then opt.fromScratch = true elseif opt.fromScratch == 0 then opt.fromScratch = false else print "==> Incorrect value for fromScratch argument. Acceptables: 0 or 1" os.exit() end
 	if opt.benchmark == 1 then opt.benchmark = true elseif opt.benchmark == 0 then opt.benchmark = false else print "==> Incorrect value for 'benchmark' argument" os.exit() end
 end
@@ -181,7 +179,7 @@ local function unZipFolder(zipFilePath, folderNames, dataFolderPath, folderLooku
 	return flag, unZippedPath
 end
 
-local function divideDataForViewPoints(data, randPerm, pTrain, pValid, pTest)
+local function divideDataForViewPoints(data, pTrain, pValid, pTest)
 	--[[
 		Divides the data into chunks for each view point
 		Input:
@@ -190,7 +188,6 @@ local function divideDataForViewPoints(data, randPerm, pTrain, pValid, pTest)
 			path: The path where the images for one object class are stored
 			files: A table containing the file names in the path
 			label: An string
-		randPerm: Indicates whether random permutation should be done on the data or not: true | false
 		pTrain, pValid and pTest: Determine, in percentage, how much of the raw data should be divided into train, validation and test
 
 		Outputs:
@@ -237,22 +234,20 @@ local function divideDataForViewPoints(data, randPerm, pTrain, pValid, pTest)
 
 
 	-- Do random permutation on the data paths
-	if randPerm then
-		local tempVPsDataPath = {}
-		local tempLabels = {}
-		local numImages = #viewPointsDataPath[1]
-		local tempRandPerm = torch.totable(torch.randperm(numImages)) -- Assuming there are exactly N number of view point depth maps for each 3D shape model
-		for i=1, numViewPoints do
-			tempVPsDataPath[i] = {}
-			tempLabels[i] = {}
-			for j=1, numImages do
-				tempVPsDataPath[i][j] = viewPointsDataPath[i][tempRandPerm[j]]
-				tempLabels[i][j] = labels[i][tempRandPerm[j]]
-			end
+	local tempVPsDataPath = {}
+	local tempLabels = {}
+	local numImages = #viewPointsDataPath[1]
+	local tempRandPerm = torch.totable(torch.randperm(numImages)) -- Assuming there are exactly N number of view point depth maps for each 3D shape model
+	for i=1, numViewPoints do
+		tempVPsDataPath[i] = {}
+		tempLabels[i] = {}
+		for j=1, numImages do
+			tempVPsDataPath[i][j] = viewPointsDataPath[i][tempRandPerm[j]]
+			tempLabels[i][j] = labels[i][tempRandPerm[j]]
 		end
-		viewPointsDataPath = tempVPsDataPath
-		labels = tempLabels
 	end
+	viewPointsDataPath = tempVPsDataPath
+	labels = tempLabels
 
 	-- Divide the paths into train, validation and test path sets
 	local numSamples = 0
@@ -464,7 +459,7 @@ for t = 1, (not opt.benchmark or (not opt.zip and not opt.fromScratch)) and 1 or
 			-- Devide up the data into N parts where N is the number of view points
 			if opt.benchmark and t == 1 then opt.pTrain = 1 opt.pValid = 0 opt.pTest = 0
 			elseif opt.benchmark and t == 2 then opt.pTrain = 0 opt.pValid = 1 opt.pTest = 0 end
-			viewPointsDataPath, labels = divideDataForViewPoints(data, opt.randPerm, opt.pTrain, opt.pValid, opt.pTest)
+			viewPointsDataPath, labels = divideDataForViewPoints(data, opt.pTrain, opt.pValid, opt.pTest)
 			local tempImg
 			if opt.rawDataType == 'float' then
 				tempImg = loadTxtIntoTensor(viewPointsDataPath[1][1][1])
@@ -607,7 +602,7 @@ for t = 1, (not opt.benchmark or (not opt.zip and not opt.fromScratch)) and 1 or
 			if opt.benchmark then opt.zip = true end
 		end -- if not opt.zip
 	else
-		viewPointsDataPath = divideDataForViewPoints(data, opt.randPerm, opt.pTrain, opt.pValid, opt.pTest)
+		viewPointsDataPath = divideDataForViewPoints(data, opt.pTrain, opt.pValid, opt.pTest)
 		local viewPointsPath = viewPointsDataPath[1]
 		opt.numVPs = #viewPointsPath[1]
 		print ("==> The program will be using the pre-stored data on disk.")

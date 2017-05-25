@@ -14,9 +14,9 @@ function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, d
         print ('==> Drawing ' .. (conditional and ' conditional random ' or 'random') .. ' samples. Configs: ' .. 'Num of Sample Sets: ' .. nSamples .. ', Canvas Size: ' .. canvasHW .. ' x ' .. canvasHW .. (sampleZembeddings and ', Empirical Mean' or (', Mean: ' .. mean))  .. (sampleZembeddings and ', Empirical Var' or (', Diag. Var: ' .. var)))
         expDirName = conditional and 'conditionalSamples' or 'randomSamples'
         if not sampleZembeddings then
-            paths.mkdir(string.format('%s/%s/Mean_%.3f-Var_%.2f/', mainOutputDirPath, expDirName, mean, var))
+            paths.mkdir(string.format('%s/%s-Mean_%.2f-Var_%.2f/', mainOutputDirPath, expDirName, mean, var))
         else
-            paths.mkdir(string.format('%s/%s/empirical/', mainOutputDirPath, expDirName))
+            paths.mkdir(string.format('%s/%s-empirical/', mainOutputDirPath, expDirName))
         end
         local canvasSize = (not expType and conditional and canvasHW - 1) or canvasHW
         local meanVec = torch.Tensor(1, nLatents):fill(mean)
@@ -37,15 +37,15 @@ function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, d
             if allowSampleForCategory or sampleCategory == '' or not expType then
                 if conditional then
                     if not sampleZembeddings then
-                        savePathRandom = string.format('%s/%s/Mean_%.3f-Var_%.2f/%s/', mainOutputDirPath, expDirName, mean, var, data.category[c])
+                        savePathRandom = string.format('%s/%s-Mean_%.2f-Var_%.2f/%s/', mainOutputDirPath, expDirName, mean, var, data.category[c])
                     else
-                        savePathRandom = string.format('%s/%s/empirical/%s/', mainOutputDirPath, expDirName, data.category[c])
+                        savePathRandom = string.format('%s/%s-empirical/%s/', mainOutputDirPath, expDirName, data.category[c])
                     end
                 else
                     if not sampleZembeddings then
-                        savePathRandom = string.format('%s/%s/Mean_%.3f-Var_%.2f/', mainOutputDirPath, expDirName, mean, var)
+                        savePathRandom = string.format('%s/%s-Mean_%.2f-Var_%.2f/', mainOutputDirPath, expDirName, mean, var)
                     else
-                        savePathRandom = string.format('%s/%s/empirical/', mainOutputDirPath, expDirName)
+                        savePathRandom = string.format('%s/%s-empirical/', mainOutputDirPath, expDirName)
                     end
                 end
                 for j=1, nSamples do
@@ -104,12 +104,12 @@ function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, d
         collectgarbage()
     end
     if not expType or expType and expType == 'interpolation' then
-        expDirName = opt.expType and 'interpolation' .. (commonFuncs.numOfDirs(mainOutputDirPath)+1 >= 1 and  commonFuncs.numOfDirs(mainOutputDirPath)+1 or 1) or 'interpolation' -- In case a directory has been created already, this will help putting the new results into a new directory
+        expDirName = expType and 'interpolation' .. (commonFuncs.numOfDirs(mainOutputDirPath)+1 >= 1 and  commonFuncs.numOfDirs(mainOutputDirPath)+1 or 1) or 'interpolation' -- In case a directory has been created already, this will help putting the new results into a new directory
         paths.mkdir(string.format('%s/%s/', mainOutputDirPath, expDirName))
         local savePathDataInterpolate = string.format('%s/%s', mainOutputDirPath, expDirName)
-        print ("==> Doing interpolation. Configs - Number of Samples: " .. ((nSamples - 1) > 0 and nSamples - 1 or 1) .. ", Canvas Size: " .. canvasHW - 1 .. " X " .. canvasHW - 1)
-        nSamples = (nSamples - 1) >= 2 and nSamples - 1 or 2
-        canvasHW = (canvasHW - 1) >= 3 and canvasHW - 1 or 3
+        print ("==> Doing interpolation. Configs - Number of Samples: " .. nSamples - 2 .. ", Canvas Size: " .. canvasHW - 1 .. " X " .. canvasHW - 1)
+        nSamples = nSamples - 1 --Just to save computation time
+        canvasHW = canvasHW - 1 --Just to save computation time
         local classID = 0
         for class=1, #data.category do
             local continueFlag = false
@@ -126,7 +126,7 @@ function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, d
             if continueFlag then
                 local numOfVPsToDrop = torch.zeros(1) -- A placeholder to hold the number of view points to be dropped for the current category
                 local dropIndices = torch.zeros(numVPs) -- A placeholder to hold the indices of the tensor to be zeroed-out  -- Used for dropoutNet
-                local pickedVPs = torch.Tensor(2) -- A placeholder to hold the view point to be preserved -- Used for singleVPNet
+                local pickedVPs = torch.Tensor(2) -- A placeholder to hold the view point to be kept -- Used for singleVPNet
                 if not expType or VpToKeep >= numVPs then
                     pickedVPs[1] = torch.random(1, numVPs)
                     pickedVPs[2] = pickedVPs[1]
@@ -179,24 +179,13 @@ function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, d
                             end
 
                             local predClassVec
-                            if dropoutNet or singleVPNet then
-                                droppedInputs = commonFuncs.dropInputVPs({depthMaps, silhouettes}, not singleVPNet and VpToKeep or nil, true, numOfVPsToDrop, dropIndices, singleVPNet, pickedVPs)
-                                if conditional then
-                                    mean, log_var, predictedClassScores = unpack(model:get(2):forward(not opt.silhouetteInput and droppedInputs[1] or droppedInputs[2]))
-                                    predClassVec = commonFuncs.computeClassificationAccuracy(predictedClassScores, nil, true, #data.category)
-                                    model:get(conditionalModel+4):forward({model:get(3):forward({mean, log_var}), predClassVec})
-                                else
-                                    model:forward(not opt.silhouetteInput and droppedInputs[1] or droppedInputs[2])
-                                end
+                            droppedInputs = commonFuncs.dropInputVPs({depthMaps, silhouettes}, true, dropoutNet, numOfVPsToDrop, dropIndices, singleVPNet, pickedVPs)
+                            if conditional then
+                                mean, log_var, predictedClassScores = unpack(model:get(2):forward(silhouetteInput and droppedInputs[2] or droppedInputs[1]))
+                                predClassVec = commonFuncs.computeClassificationAccuracy(predictedClassScores, nil, true, predictedClassScores:size(2))
+                                model:get(conditionalModel+4):forward({model:get(3):forward({mean, log_var}), predClassVec})
                             else
-                                droppedInputs = commonFuncs.dropInputVPs(not silhouetteInput and depthMaps or silhouettes, nil, true, numOfVPsToDrop, dropIndices, singleVPNet, pickedVPs)
-                                if conditional then
-                                    mean, log_var, predictedClassScores = unpack(model:get(2):forward(droppedInputs))
-                                    predClassVec = commonFuncs.computeClassificationAccuracy(predictedClassScores, nil, true, #data.category)
-                                    model:get(conditionalModel+4):forward({model:get(3):forward({mean, log_var}), predClassVec})
-                                else
-                                    model:forward(droppedInputs)
-                                end
+                                model:forward(silhouetteInput and droppedInputs[2] or droppedInputs[1])
                             end
                             
                             local dataBeingUsed = depthMaps:clone()
@@ -307,7 +296,6 @@ function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, d
                                         end
                                     end
 
-                                    local handle
                                     if sampleType ~= 'interpolate' then
                                         paths.mkdir(string.format('%s/%s/example-%d/samples', savePathDataInterpolate, data.category[class], nTotalSamples - 1))
                                         paths.mkdir(string.format('%s/%s/example-%d/samples/mask', savePathDataInterpolate, data.category[class], nTotalSamples - 1))

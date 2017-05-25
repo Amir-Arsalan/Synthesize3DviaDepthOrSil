@@ -1,10 +1,6 @@
 #!~/torch/install/bin/th
 -- The original VAE implementation obtained from 'https://github.com/y0ast/VAE-Torch'
 
---[[
-TODO: Describe the data structure saved on disk
---]]
-
 
 require 'nn'
 require 'cutorch'
@@ -38,32 +34,32 @@ if not opt then
     cmd:option('-fromScratch', 0, "It indicates whether to use the pre-stored, resized data or do the process of resizing again: 0 | 1")
     cmd:option('-imgSize', 224, '3D grid size. E.g. 224')
     -- Model:
-    cmd:option('-nCh', 64, "Base number of feature maps for each convolutional layer")
-    cmd:option('-nLatents', 400, 'The number of latent variables in the Z layer')
+    cmd:option('-nCh', 74, "Base number of feature maps for each convolutional layer")
+    cmd:option('-nLatents', 120, 'The number of latent variables in the Z layer')
     cmd:option('-tanh', 0, "Set to 1 if you want to normalize the input/output values to be between -1 and 1 instead of 0 to 1")
     -- Training:
     cmd:option('-batchSize', 4, 'Batch size for training (SGD): any integer number (1 or higher)')
     cmd:option('-batchSizeChangeEpoch', 15, 'Changes the batch size every X epochs')
-    cmd:option('-batchSizeChange', 5, 'The number to be subtracted/added every opt.batchSizeChangeEpoch from opt.batchSize: any integer number (1 or higher)')
+    cmd:option('-batchSizeChange', 20, 'The number to be subtracted/added every opt.batchSizeChangeEpoch from opt.batchSize: any integer number (1 or higher)')
     cmd:option('-targetBatchSize', 8, 'Maximum batch size (could be set equal to batchSize)')
     cmd:option('-nReconstructions', 50, 'An integer indicating how many reconstuctions to be generated from the test data set')
     cmd:option('-initialLR', 0.0000035, 'The learning rate to be used for the first few epochs of training')
     cmd:option('-lr', 0.000085, 'The learning rate: Any positive decimal value')
     cmd:option('-lrDecay', 0.98, 'The rate to aneal the learning rate')
-    cmd:option('-maxEpochs', 50, 'The maximum number of epochs')
+    cmd:option('-maxEpochs', 80, 'The maximum number of epochs')
     cmd:option('-dropoutNet', 0, 'Set to 1 to drop 15 to 18 views during training')
     cmd:option('-VpToKeep', 100, 'Drops all VPs except this one. The valid range is [0 ... opt.numVPs]. Set it to > opt.numVPs to ignore')
     cmd:option('-silhouetteInput', 0, 'Indicates whether only the silhouettes must be used for training')
     cmd:option('-singleVPNet', 0, 'If set to 1, will perform random permutation on the input vector view point channels')
     cmd:option('-conditional', 0, 'Indicates whether the model is trained conditionally')
-    cmd:option('-KLD', 70, 'The coefficient for the gradients of the KLD loss')
+    cmd:option('-KLD', 100, 'The coefficient for the gradients of the KLD loss')
     -- Testing
     cmd:option('-canvasHW', 5, 'Determines the height and width of the canvas on which the samples from the manifold will be shown on')
     cmd:option('-nSamples', 6, 'Number of samples to be drawn from the prior (z), for each category (if conditional) or otherwise in total')
-    cmd:option('-sampleType', 'random', 'Determines the number of latent variables: data | interpolate | random')
-    cmd:option('-sampleCategory', '', "The category name from which one would like to start generating samples. E.g. 'chair, car, airplane'. If empty, the conditional models will generate samples for all categories in the data set. Will be used if opt.sampleType == 'data': A valid category name for which there are examples in the train data set")
+    cmd:option('-manifoldExp', 'randomSampling', 'The experiment to be performed on the manifold : randomSampling, interpolation')
+    cmd:option('-sampleCategory', '', "The category name from which one would like to start generating samples. E.g. 'chair, car, airplane'. If empty, the conditional models will generate samples for all categories in the data set. Will be used if opt.manifoldExp == 'data': A valid category name for which there are examples in the train data set")
     cmd:option('-mean', 0, 'The mean on the z vector elements: Any real number')
-    cmd:option('-var', 0, 'The variance of the z vector elements. In case sampleType = data then it indicates the ratio by which the predicted model variance will be multiplied by: Any positive real number')
+    cmd:option('-var', 0, 'The variance of the z vector elements. In case manifoldExp = data then it indicates the ratio by which the predicted model variance will be multiplied by: Any positive real number')
     cmd:option('-range', 3, 'The range on the real line from which to generate samples: Any positive real number')
     cmd:text()
     opt = cmd:parse(arg or {})
@@ -210,6 +206,7 @@ print ''
 print ("==> Number of Model Parameters: " .. parameters:nElement())
 while continueTraining and epoch <= opt.maxEpochs do
 
+    local totalBatchesFed = 0
     local totalError = 0
     local tic = torch.tic()
     local numTrainSamples = 0
@@ -240,6 +237,7 @@ while continueTraining and epoch <= opt.maxEpochs do
 
         ticc = torch.tic()
         for t,v in ipairs(indices) do
+            totalBatchesFed = totalBatchesFed + 1
             
             local targetClassIndices, targetClassHotVec, droppedInputs
             local depthMaps = data.dataset:index(1,v):cuda()
@@ -269,24 +267,22 @@ while continueTraining and epoch <= opt.maxEpochs do
                 gMod:zeroGradParameters()
 
                 local reconstruction, mean, log_var, predictedClassScores
-                if opt.dropoutNet then
-                    -- Randomly drop 15-18 views (used for DropOutNet)
-                    droppedInputs = commonFuncs.dropInputVPs(not opt.silhouetteInput and depthMaps or silhouettes, opt.VpToKeep, false, nil, nil, opt.singleVPNet, nil, targetClassHotVec)
-                else
-                    droppedInputs = commonFuncs.dropInputVPs(not opt.silhouetteInput and depthMaps or silhouettes, nil, false, nil, nil, opt.singleVPNet, nil, targetClassHotVec)
-                end
+               
+                droppedInputs = commonFuncs.dropInputVPs(not opt.silhouetteInput and depthMaps or silhouettes, false, opt.dropoutNet, nil, nil, opt.singleVPNet, nil, targetClassHotVec)
 
                 local tempTensor = opt.conditional and droppedInputs[1] or droppedInputs
-                -- Randomly permute the input views
-                -- if not opt.singleVPNet and t % (20 + epoch * 3) == 0 then
-                --     for temp=1, batch_size do
-                --         tempTensor[temp] = tempTensor[temp]:index(1, torch.randperm(opt.numVPs):long())
-                --     end
-                -- end
+                -- Randomly permute the input views until epoch 10
+                if not opt.singleVPNet and totalBatchesFed % (math.max(80 + epoch * 6, 320)) == 0 then
+                    for temp=1, batch_size do
+                        tempTensor[temp] = tempTensor[temp]:index(1, torch.randperm(opt.numVPs):long())
+                    end
+                end
                 
                 -- Inject random noise to the input
                 local tempNoisyInput = tempTensor[tempTensor:gt(0)]
-                tempTensor[tempTensor:gt(0)] = tempNoisyInput:add(torch.rand(tempNoisyInput:size()):div(epoch <= 6 and epoch*10 or epoch <= 20 and 60 or 80):cuda()) -- Add some noise -- The input is not always clean
+                if totalBatchesFed % 10 ~= 0 then
+                    tempTensor[tempTensor:gt(0)] = tempNoisyInput:add(torch.rand(tempNoisyInput:size()):div(epoch <= 6 and epoch*9 or epoch <= 20 and 60 or 70):cuda()) -- Add some noise -- The input is not always clean
+                end
 
                 reconstruction, mean, log_var, predictedClassScores = unpack(model:forward(droppedInputs))
 
@@ -307,14 +303,15 @@ while continueTraining and epoch <= opt.maxEpochs do
                     -- The number of examples from the current batch that are correctly classified
                     trainClassAccuracyList[epoch] = trainClassAccuracyList[epoch] + commonFuncs.computeClassificationAccuracy(predictedClassScores, targetClassIndices)
                     dEn_dwClass = classLabelCriterion:backward(predictedClassScores, targetClassIndices)
+                    -- Inject small noise to the classification layer's gradients until epoch 4
                     if epoch <= 4 then
                         dEn_dwClass:add(dEn_dwClass.new():resizeAs(dEn_dwClass):normal(0, 0.002))
                     end
                     trainClassErrList[epoch] = trainClassErrList[epoch] + classErr
                 end
 
-                -- Inject noise to the reconstructions and before computing the gradients
-                if epoch <= 20 and (not opt.singleVPNet and t % (10 + epoch * 6) == 0 or t % (20 + epoch * 8) == 0) then
+                -- Inject small noise to the reconstructions and before computing the gradients until epoch 20 -- Injects a bit more noise while training for AllVPNet and DropoutNet
+                if epoch <= 20 and (not opt.singleVPNet and totalBatchesFed % (10 + epoch * 6) == 0 or totalBatchesFed % (20 + epoch * 8) == 0) then
                     local temp1 = reconstruction[1][reconstruction[1]:gt(0)]
                     local temp2 = reconstruction[2][reconstruction[2]:gt(0)]
                     reconstruction[1][reconstruction[1]:gt(0)] = temp1:add(torch.rand(temp1:size()):div(epoch * 90):cuda())
@@ -362,7 +359,7 @@ while continueTraining and epoch <= opt.maxEpochs do
                 droppedInputs = nil
                 tempTensor = nil
                 silhouettes = nil
-                if t % 2 == 0 then collectgarbage() end
+                if totalBatchesFed % 2 == 0 then collectgarbage() end
                 return batchTotalError, gradients
             end
 
@@ -384,6 +381,7 @@ while continueTraining and epoch <= opt.maxEpochs do
     end -- for i=2, #trainDataFiles + 1
     
 
+    totalBatchesFed = 0
     totalError = totalError/numTrainSamples/(opt.imgSize^2*opt.numVPs)
     trainTotalErrorList[epoch] = totalError
     trainKLDErrList[epoch] = trainKLDErrList[epoch]/numTrainSamples
@@ -415,6 +413,7 @@ while continueTraining and epoch <= opt.maxEpochs do
     validClassAccuracyList[epoch] = 0
     print ("==> Epoch: " .. epoch .. " Validation for '" .. #validationDataFiles .. "' file(s) containing the validation data set samples on the disk")
 
+if epoch >= 52 then
     data = torch.load(validationDataFiles[1])
     for i=2, #validationDataFiles + 1 do
 
@@ -447,13 +446,8 @@ while continueTraining and epoch <= opt.maxEpochs do
             end
 
             local reconstruction, mean, log_var, predictedClassScores
-            if opt.dropoutNet then
-                droppedInputs = commonFuncs.dropInputVPs(not opt.silhouetteInput and depthMaps or silhouettes, opt.VpToKeep, false, nil, nil, opt.singleVPNet, nil, targetClassHotVec)
-                reconstruction, mean, log_var, predictedClassScores = unpack(model:forward(droppedInputs))
-            else
-                droppedInputs = commonFuncs.dropInputVPs(not opt.silhouetteInput and depthMaps or silhouettes, nil, false, nil, nil, opt.singleVPNet, nil, targetClassHotVec)
-                reconstruction, mean, log_var, predictedClassScores = unpack(model:forward(droppedInputs))
-            end
+            droppedInputs = commonFuncs.dropInputVPs(not opt.silhouetteInput and depthMaps or silhouettes, false, opt.dropoutNet, nil, nil, opt.singleVPNet, nil, targetClassHotVec)
+            reconstruction, mean, log_var, predictedClassScores = unpack(model:forward(droppedInputs))
 
             if opt.conditional then
                 classErr = classLabelCriterion:forward(predictedClassScores, targetClassIndices)
@@ -488,12 +482,12 @@ while continueTraining and epoch <= opt.maxEpochs do
             depthMaps = nil
             silhouettes = nil
             droppedInputs = nil
-            if t % 2 == 0 then collectgarbage() end
+            if totalBatchesFed % 2 == 0 then collectgarbage() end
         end
         
         validationTotalError = validationTotalError + batchTotalError
         batchTotalError = 0
-        
+       
 
         -- Some clean up and load the next file, if any
         data.dataset = nil
@@ -506,6 +500,7 @@ while continueTraining and epoch <= opt.maxEpochs do
         end
 
     end -- for i=2, #validationDataFiles + 1
+end 
 
     validationTotalError = validationTotalError/numValidSamples/(opt.imgSize^2*opt.numVPs)
     validationTotalErrorList[epoch] = validationTotalError
@@ -533,6 +528,7 @@ while continueTraining and epoch <= opt.maxEpochs do
     -- sampleZembeddings[2]:log()
 
 
+    -- Save the errors into tensors -- to be used for plotting
     if epoch == 1 then
         trainTotalErrTensor = torch.Tensor(1,1):fill(totalError/numTrainSamples)
         validTotalErrTensor = torch.Tensor(1,1):fill(validationTotalError/numValidSamples)
@@ -540,6 +536,7 @@ while continueTraining and epoch <= opt.maxEpochs do
         trainTotalErrTensor = torch.cat(trainTotalErrTensor,torch.Tensor(1,1):fill(totalError/numTrainSamples),1)
         validTotalErrTensor = torch.cat(validTotalErrTensor, torch.Tensor(1,1):fill(validationTotalError/numValidSamples),1)
     end
+
     if lrDecayDrastic <= 3 and epoch >= (opt.benchmark and 24 or 18) and (epoch % (opt.benchmark and 8 or 6)) == 0 then
         lrDecayDrastic = lrDecayDrastic + 1
         print ("==> Learning rate has been SIGNIFICANTLY decreased to " .. config.learningRate * 0.35 .. " from its previous value of " .. config.learningRate)
@@ -547,13 +544,13 @@ while continueTraining and epoch <= opt.maxEpochs do
     end
 
     
-    -- Reconstruct some of the test samples
+    -- Reconstruct opt.nReconstructions number of test samples, chosen randomly
     N = 1
-    if continueTraining and epoch >= 38 and epoch % 2 == 0 then
+    if continueTraining and epoch >= 52 and epoch % 2 == 0 then
         data = torch.load(testDataFiles[1])
         reconBatchSizePerTestFile = math.floor(opt.nReconstructions / #testDataFiles)
         local reconItersPerTestFile = 1
-        if reconBatchSizePerTestFile > 50 then -- At most, only transfer 50 samples to GPU
+        if reconBatchSizePerTestFile > 50 then -- Transfer 50 samples to GPU, at most
             while reconBatchSizePerTestFile > 50 do
                 reconBatchSizePerTestFile = math.floor(reconBatchSizePerTestFile * 0.9)
             end
@@ -609,25 +606,14 @@ while continueTraining and epoch <= opt.maxEpochs do
                     end
 
                     local mean, log_var, predictedClassScores
-                    if opt.dropoutNet or opt.singleVPNet then
-                        droppedInputs = commonFuncs.dropInputVPs({depthMaps, silhouettes}, not opt.singleVPNet and opt.VpToKeep or nil, true, nil, nil, opt.singleVPNet)
-                        if opt.conditional then
-                            mean, log_var, predictedClassScores = unpack(encoder:forward(not opt.silhouetteInput and droppedInputs[1] or droppedInputs[2]))
-                            local predClassVec = commonFuncs.computeClassificationAccuracy(predictedClassScores, nil, true, #data.category)
-                            recon = decoder:forward({nn.Sampler():cuda():forward({mean, log_var}), predClassVec})
-                        else
-                            recon = unpack(model:forward(not opt.silhouetteInput and droppedInputs[1] or droppedInputs[2]))
-                        end
+                    droppedInputs = commonFuncs.dropInputVPs({depthMaps, silhouettes}, true, opt.dropoutNet, nil, nil, opt.singleVPNet)
+                    if opt.conditional then
+                        mean, log_var, predictedClassScores = unpack(encoder:forward(opt.silhouetteInput and droppedInputs[2] or droppedInputs[1]))
+                        local predClassVec = commonFuncs.computeClassificationAccuracy(predictedClassScores, nil, true, #data.category)
+                        recon = decoder:forward({nn.Sampler():cuda():forward({mean, log_var}), predClassVec})
                     else
-                        droppedInputs = commonFuncs.dropInputVPs(not opt.silhouetteInput and depthMaps or silhouettes, nil, true, nil, nil, opt.singleVPNet)
-                        if opt.conditional then
-                            mean, log_var, predictedClassScores = unpack(encoder:forward(droppedInputs))
-                            local predClassVec = commonFuncs.computeClassificationAccuracy(predictedClassScores, nil, true, #data.category)
-                            recon = decoder:forward({nn.Sampler():cuda():forward({mean, log_var}), predClassVec})
-                        else
-                            recon = unpack(model:forward(droppedInputs))
-                        end
-                    end                        
+                        recon = unpack(model:forward(opt.silhouetteInput and droppedInputs[2] or droppedInputs[1]))
+                    end                      
 
                     reconSil = recon[2]:clone()
                     recon[2] = nil
@@ -648,15 +634,13 @@ while continueTraining and epoch <= opt.maxEpochs do
                         tempSilRecon = reconSil[k]
                         tempSilOrig = silhouettes[k]
                         tempSilOrig[tempSilOrig:gt(0)] = 1
-                        local handle = assert(io.popen(string.format('mkdir -p %s/images-Latents_%d-BS_%d-Ch_%d-lr_%.5f/epoch%d/reconstruction/model%d-%s', opt.modelDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr, epoch, N, data.category[tempLabel])))
-                        local handle = assert(io.popen(string.format('mkdir -p %s/images-Latents_%d-BS_%d-Ch_%d-lr_%.5f/epoch%d/reconstruction/model%d-%s/mask', opt.modelDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr, epoch, N, data.category[tempLabel])))
-                        handle:close()
-
+                        local reconPath = string.format('%s/results/epoch%d/randomReconstructions/%s/test/model%d-%s', opt.modelDirName, epoch, data.category[tempLabel], N, data.category[tempLabel])
+                        paths.mkdir(reconPath .. '/mask')
                         for ll=1, opt.numVPs do
-                            image.save(string.format('%s/images-Latents_%d-BS_%d-Ch_%d-lr_%.5f/epoch%d/reconstruction/model%d-%s/file%d-img%d-%d-rec.png',opt.modelDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr, epoch, N, data.category[tempLabel], j - 2, v[k], ll-1), tempRecon[ll])
-                            image.save(string.format('%s/images-Latents_%d-BS_%d-Ch_%d-lr_%.5f/epoch%d/reconstruction/model%d-%s/file%d-img%d-%d-or.png', opt.modelDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr, epoch, N, data.category[tempLabel], j - 2, v[k], ll-1), tempOr[ll])
-                            image.save(string.format('%s/images-Latents_%d-BS_%d-Ch_%d-lr_%.5f/epoch%d/reconstruction/model%d-%s/mask/file%d-img%d-%d-rec.png',opt.modelDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr, epoch, N, data.category[tempLabel], j - 2, v[k], ll-1), tempSilRecon[ll])
-                            image.save(string.format('%s/images-Latents_%d-BS_%d-Ch_%d-lr_%.5f/epoch%d/reconstruction/model%d-%s/mask/file%d-img%d-%d-or.png', opt.modelDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr, epoch, N, data.category[tempLabel], j - 2, v[k], ll-1), tempSilOrig[ll])
+                            image.save(reconPath .. string.format('/file%d-img%d-%d-rec.png', j - 2, v[k], ll-1), tempRecon[ll])
+                            image.save(reconPath .. string.format('/file%d-img%d-%d-or.png', j - 2, v[k], ll-1), tempOr[ll])
+                            image.save(reconPath .. string.format('/mask/file%d-img%d-%d-rec.png', j - 2, v[k], ll-1), tempSilRecon[ll])
+                            image.save(reconPath .. string.format('/mask/file%d-img%d-%d-or.png', j - 2, v[k], ll-1), tempSilOrig[ll])
                         end
                         numRecon = numRecon + 1
                         N = N + 1
@@ -684,29 +668,35 @@ while continueTraining and epoch <= opt.maxEpochs do
     else
         trainDataFiles = commonFuncs.randPermTableElements(trainDataFiles)
         data = torch.load(trainDataFiles[1]) -- Load the first training file for the next epoch
-        -- data.dataset = data.dataset[{{1, data.dataset:size(1)}, {1}}]
         if opt.tanh then data.dataset = commonFuncs.normalizeMinusOneToOne(data.dataset) end
     end -- END if continueTraining then and epoch >= 10
 
 
     -- Save the model and parameters
-    local handle = assert(io.popen(string.format('mkdir -p %s/save-Latents_%d-BS_%d-Ch_%d-lr_%.5f/epoch%d', opt.modelDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr, epoch)))
-    handle:close()
-    if continueTraining and epoch >= (opt.benchmark and 42 or 36) and epoch % 2 == 0 then
+    if continueTraining and epoch >= 50 or epoch == opt.maxEpochs then
+        local modelPath = string.format('%s/model/epoch%d/', opt.modelDirName, epoch)
+        paths.mkdir(modelPath)
         state.v = state.v:float()
         state.m = state.m:float()
         state.denom = state.denom:float()
         collectgarbage()
-        print (string.format('==> Saving the model on iteration %d.', epoch))
+        print (string.format("==> Saving the model and optimizer's state parameters on iteration %d.", epoch))
         gMod:clearState() -- Clear the gradInput and output fields of the modules for the model before saving
-        torch.save(string.format('%s/save-Latents_%d-BS_%d-Ch_%d-lr_%.5f/epoch%d/model.t7', opt.modelDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr, epoch), gMod:clone():float())
-        torch.save(string.format('%s/save-Latents_%d-BS_%d-Ch_%d-lr_%.5f/epoch%d/parameters.t7', opt.modelDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr, epoch), parameters:clone():float())
-        torch.save(string.format('%s/save-Latents_%d-BS_%d-Ch_%d-lr_%.5f/epoch%d/state.t7', opt.modelDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr, epoch), state)
+        if cudnn then
+            gMod = cudnn.convert(gMod, nn)
+        end
+        torch.save(modelPath .. 'model.t7', gMod:clone():float())
+        torch.save(modelPath .. 'state.t7', parameters:clone():float())
+        torch.save(modelPath .. 'parameters.t7', state)
+        if cudnn then
+            gMod = cudnn.convert(gMod, cudnn)
+            print '\n'
+        end
         if sampleZembeddings then
             for l=1, #sampleZembeddings do
                 sampleZembeddings[l] = sampleZembeddings[l]:float()
             end
-            torch.save(string.format('%s/save-Latents_%d-BS_%d-Ch_%d-lr_%.5f/epoch%d/mean_logvar.t7', opt.modelDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr, epoch), sampleZembeddings)
+            torch.save(modelPath .. 'mean_logvar.t7', sampleZembeddings)
             for l=1, #sampleZembeddings do
                 sampleZembeddings[l] = sampleZembeddings[l]:cuda()
             end
@@ -718,31 +708,32 @@ while continueTraining and epoch <= opt.maxEpochs do
         collectgarbage()
     end
 
-    -- Sample [or do interpolation on] the learned manifold
-    if continueTraining and epoch >= (opt.benchmark and 62 or 48) and epoch % (opt.benchmark and 3 or 2) == 0 then
-        local samplesPath = string.format(paths.cwd() .. '/%s/images-Latents_%d-BS_%d-Ch_%d-lr_%.5f/epoch%d/manifold',opt.modelDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr, epoch)
-        sampleManifold.sample(opt.sampleType, opt.sampleCategory, opt.canvasHW, opt.nSamples, data, model, samplesPath, opt.mean, opt.var, opt.nLatents, opt.imgSize, opt.numVPs, epoch, opt.batchSize, opt.targetBatchSize, opt.testPhase, opt.tanh, opt.dropoutNet, opt.VpToKeep, opt.silhouetteInput, sampleZembeddings, opt.singleVPNet, opt.conditional, nil, opt.benchmark)
+    -- Sample/[do interpolation on] the learned manifold
+    if continueTraining and epoch >= (opt.benchmark and 72 or 52) and epoch % (opt.benchmark and 3 or 2) == 0 then
+        local samplesPath = string.format(paths.cwd() .. '/%s/results/epoch%d/manifold',opt.modelDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr, epoch)
+        sampleManifold.sample(opt.manifoldExp, opt.sampleCategory, opt.canvasHW, opt.nSamples, data, model, samplesPath, opt.mean, opt.var, opt.nLatents, opt.imgSize, opt.numVPs, epoch, opt.batchSize, opt.targetBatchSize, opt.testPhase, opt.tanh, opt.dropoutNet, opt.VpToKeep, opt.silhouetteInput, sampleZembeddings, opt.singleVPNet, opt.conditional, nil, opt.benchmark)
     end
 
 
     --Save train and validation lowerbound Torch tensors on disk
-    local trainErPath = string.format('%s/save-Latents_%d-BS_%d-Ch_%d-lr_%.5f/ErrTotalTrainSet.t7', opt.modelDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr)
-    local trainErKLDPath = string.format('%s/save-Latents_%d-BS_%d-Ch_%d-lr_%.5f/ErrKLDTrainSet.t7', opt.modelDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr)
-    local trainErDepthMapPath = string.format('%s/save-Latents_%d-BS_%d-Ch_%d-lr_%.5f/ErrDepthMapTrainSet.t7', opt.modelDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr)
+    local errorPath = string.format('%s/error/', opt.modelDirName)
+    paths.mkdir (errorPath)
+    local trainErPath = errorPath .. 'ErrTotalTrainSet.t7'
+    local trainErKLDPath = errorPath .. 'ErrKLDTrainSet.t7'
+    local trainErDepthMapPath = errorPath .. 'ErrDepthMapTrainSet.t7'
     torch.save(trainErPath, torch.FloatTensor(trainTotalErrTensor))
     torch.save(trainErKLDPath, torch.FloatTensor(trainKLDErrList))
     torch.save(trainErDepthMapPath, torch.FloatTensor(trainDepthMapErrList))
 
-    local validErPath = string.format('%s/save-Latents_%d-BS_%d-Ch_%d-lr_%.5f/ErrTotalValidationSet.t7', opt.modelDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr)
-    local validErKLDPath = string.format('%s/save-Latents_%d-BS_%d-Ch_%d-lr_%.5f/ErrKLDValidationSet.t7', opt.modelDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr)
-    local validErDepthMapPath = string.format('%s/save-Latents_%d-BS_%d-Ch_%d-lr_%.5f/ErrDepthMapValidationSet.t7', opt.modelDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr)
+    local validErPath = errorPath .. 'ErrTotalValidationSet.t7'
+    local validErKLDPath = errorPath .. 'ErrKLDValidationSet.t7'
+    local validErDepthMapPath = errorPath .. 'ErrDepthMapValidationSet.t7'
     torch.save(validErPath, torch.FloatTensor(validTotalErrTensor))
     torch.save(validErKLDPath, torch.FloatTensor(validKLDErrList))
     torch.save(validErDepthMapPath, torch.FloatTensor(validDepthMapErrList))
 
-    local trainErSilPath = '' local validErSilPath = ''
-    trainErSilPath = string.format('%s/save-Latents_%d-BS_%d-Ch_%d-lr_%.5f/ErrMaskTrainSet.t7', opt.modelDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr)
-    validErSilPath = string.format('%s/save-Latents_%d-BS_%d-Ch_%d-lr_%.5f/ErrMaskValidationSet.t7', opt.modelDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr)
+    local trainErSilPath = errorPath .. 'ErrMaskTrainSet.t7'
+    local validErSilPath = errorPath .. 'ErrMaskValidationSet.t7'
     torch.save(trainErSilPath, torch.FloatTensor(trainSilhouetteErrList))
     torch.save(validErSilPath, torch.FloatTensor(validSilErrList))
     
@@ -753,8 +744,7 @@ while continueTraining and epoch <= opt.maxEpochs do
     -- Save a plot of train and validation lowerbound error
     local plotTitle = "exp: " .. opt.modelDirName .. ", Latent: " .. opt.nLatents .. ", Batch: " .. opt.batchSize .. ", CNN Ch.: " .. opt.nCh .. ", lr " .. opt.lr
     local plotYAxis = string.format("KLD+%s", 'L1Depth-L1Sil')
-    local plotSavePath = string.format('%s/save-Latents_%d-BS_%d-Ch_%d-lr_%.5f/', opt.modelDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr)
-    commonFuncs.plotError(trainErrPaths, validErrPaths, ErrorPlotNames, plotYAxis, plotTitle, plotSavePath)
+    commonFuncs.plotError(trainErrPaths, validErrPaths, ErrorPlotNames, plotYAxis, plotTitle, errorPath)
 
     -- Learning rate for the first couple of epochs
     if epoch <= (opt.benchmark and 14 or 10) then
@@ -764,19 +754,25 @@ while continueTraining and epoch <= opt.maxEpochs do
         commonFuncs.clearOptimState(state, true)
     end
 
-    -- Learning rate decay
-    if epoch >= (opt.benchmark and 16 or 12) and epoch < (opt.benchmark and 50 or 37) and opt.lrDecay ~= 1 then 
+    -- Learning rate change
+    if epoch >= (opt.benchmark and 18 or 12) and epoch < (opt.benchmark and 50 or 37) and opt.lrDecay ~= 1 then 
         print ('==> LR decay: The learning rate has been changed to ' .. config.learningRate * opt.lrDecay .. ' from its previous value of ' .. config.learningRate)
         config.learningRate = config.learningRate * opt.lrDecay
     elseif epoch == (opt.benchmark and 50 or 37) then
-        print ('==> The learning rate has been increased to ' .. config.learningRate * 1.4 .. ' from its previous value of ' .. config.learningRate)
-        config.learningRate = config.learningRate * 1.4
-    elseif epoch > (opt.benchmark and 50 or 37) and epoch < (opt.benchmark and 80 or 50) then
+        print ('==> The learning rate has been increased to ' .. config.learningRate * 1.5 .. ' from its previous value of ' .. config.learningRate)
+        config.learningRate = config.learningRate * 1.5
+    elseif epoch > (opt.benchmark and 50 or 37) and epoch <= (opt.benchmark and 80 or 55) then
         print ('==> LR decay: The learning rate has been changed to ' .. config.learningRate * math.max(opt.lrDecay - 0.01, 0.94) .. ' from its previous value of ' .. config.learningRate)
         config.learningRate = config.learningRate * math.max(opt.lrDecay - 0.01, 0.94)
-    elseif epoch == (opt.benchmark and 80 or 50) then
+    elseif epoch == (opt.benchmark and 80 or 56) then
         print ('==> LR decay: The learning rate has been changed to ' .. config.learningRate * 0.5 .. ' from its previous value of ' .. config.learningRate)
         config.learningRate = config.learningRate * 0.5
+    end
+
+    if lrDecayDrastic <= 3 and epoch >= (opt.benchmark and 24 or 18) and (epoch % (opt.benchmark and 8 or 6)) - 1 == 0 then
+        -- Increase the learning rate for %20 on the next epoch after drastically decreaseing it
+        print ("==> Learning rate has been increased to " .. config.learningRate * 1.2 .. " from its previous value of " .. config.learningRate)
+        config.learningRate = config.learningRate * 1.2
     end
     
     -- Change the batch size
@@ -789,12 +785,6 @@ while continueTraining and epoch <= opt.maxEpochs do
             print ('==> The new batch size is ' .. math.max(math.ceil(batch_size - opt.batchSizeChange), opt.targetBatchSize) .. '. The previous batch size was ' .. batch_size)
             batch_size = math.max(math.ceil(batch_size - opt.batchSizeChange), opt.targetBatchSize)
         end
-    end
-
-    if lrDecayDrastic <= 3 and epoch >= (opt.benchmark and 24 or 18) and (epoch % (opt.benchmark and 8 or 6)) - 1 == 0 then
-        -- Increase the learning rate for %20 on the next epoch after drastically decreaseing it
-        print ("==> Learning rate has been increased to " .. config.learningRate * 1.2 .. " from its previous value of " .. config.learningRate)
-        config.learningRate = config.learningRate * 1.2
     end
 
     print ("==> Total time for epoch " .. epoch .. ": " .. torch.toc(tic)/60 .. " minutes")

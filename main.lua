@@ -12,68 +12,65 @@ cmd:text()
 cmd:text('Options:')
 -- Global:
 cmd:option('-globalDataType', 'float', "Sets the default data type for Torch tensors: 'float', 'double'")
-cmd:option('-maxMemory', 4000, 'The maximum amount of memory (in MBs) to be used for creating the training/test files')
-cmd:option('-seed', 1, "The default seed to be used for the random number generator: Any positive integer number")
-cmd:option('-testPhase', 0, 'Whether we want to run some small tests just to make sure everything works using the test set data: 0 | 1')
+cmd:option('-seed', 1, "The default seed to be used for the random number generator")
+cmd:option('-testPhase', 0, 'Set to 1 when you want to run some small tests just to make sure everything works: 0 | 1')
 cmd:option('-modelDirName', '', 'An string to be used for the name of the directory in which the reconstructions/samples and models will be stored')
-cmd:option('-modelPath', '', 'The path for a saved model')
+cmd:option('-benchmark', 0, "Set to 1 if you are working with a benchmark data set and you do not want to set any values for pTrain, pValid and pTest")
 -- Data reading/storing:
-cmd:option('-zip', 1, 'Whether the data should be read from the zip files or from what already is in /Data already: 0 | 1')
+cmd:option('-maxMemory', 3000, 'The maximum amount of memory (in MBs) to be used for creating the training/test tensor files')
+cmd:option('-zip', 0, 'Indicates whether the data set the zip files should be first extracted: 0 | 1')
+cmd:option('-fromScratch', 0, "Redo the processes of storing the images into torch tensors and saving them on disk, without extracting the zip files: 0 | 1")
 cmd:option('-rawDataType', 'int', 'Determines the type of data files to be read: int (.png files) | float (.txt files)')
 cmd:option('-pTrain', 0.925, 'How much, in percentage, of the data will be used for training')
-cmd:option('-pValid', 0.045, 'How much, in percentage, of the data will be used for validation')
-cmd:option('-pTest', 0.03, 'How much, in percentage, of the data will be used for testing')
-cmd:option('-randPerm', 1, 'Whether the data set must be shuffled before training or not?: 0 | 1')
-cmd:option('-fromScratch', 0, "Redo the entire data preparation process for the training phase. In 2_train.lua it indicates whether to use the pre-stored, resized data or do the process of resizing again: 0 | 1")
+cmd:option('-pValid', 0.045, 'How much, in percentage, of the data will be used for validation. The validation and test data sets are going to be combined when running experiments')
+cmd:option('-pTest', 0.03, 'How much, in percentage, of the data will be used for testing. The validation and test data sets are going to be combined when running experiments')
 cmd:option('-resizeScale', 1, "The resize ratio for the input data: (0, 1]")
-cmd:option('-imgSize', 224, '3D grid size. E.g. 224')
-cmd:option('-numVPs', 20, 'Number of view points for the 3D models')
-cmd:option('-benchmark', 0, "Set to 1 to process some benchmark data set")
+cmd:option('-imgSize', 224, '2D images size. E.g. 224')
+cmd:option('-numVPs', 20, 'Number of rendered view points for the 3D models')
+cmd:option('-train', 1, 'Start training the model')
 -- Model:
-cmd:option('-nCh', 64, "Base number of feature maps for each convolutional layer")
-cmd:option('-nLatents', 220, 'The number of latent variables in the Z layer')
-cmd:option('-tanh', 0, "Set to 1 if you want to normalize the input/output values to be between -1 and 1 instead of 0 to 1")
+cmd:option('-nCh', 74, "Base number of feature maps for each convolutional layer")
+cmd:option('-nLatents', 140, 'The number of latent variables in the Z layer. The input tensor is n x numVPs x imgSize x imgSize')
+cmd:option('-dropoutNet', 0, 'Set to 1 to drop 15 to 18 views during training')
+cmd:option('-silhouetteInput', 0, 'If set to 1, only silhouettes will be used for training/test')
+cmd:option('-singleVPNet', 1, 'Train/test with only 1 randomly-chosen viewpoint. The input tensor is n x 1 x imgSize x imgSize')
+cmd:option('-conditional', 1, 'Set to 1 to train conditional models')
+cmd:option('-KLD', 100, 'The coefficient for the gradients of the KLD loss')
 -- Training:
 cmd:option('-batchSize', 4, 'Batch size for training')
 cmd:option('-batchSizeChangeEpoch', 20, 'Changes the batch size every X epochs')
-cmd:option('-batchSizeChange', 2, 'The number to be subtracted/added every opt.batchSizeChangeEpoch from opt.batchSize: any integer number (1 or higher)')
+cmd:option('-batchSizeChange', 2, 'The number to be added every opt.batchSizeChangeEpoch to opt.batchSize')
 cmd:option('-targetBatchSize', 8, 'Maximum batch size')
 cmd:option('-nReconstructions', 50, 'An integer indicating how many reconstuctions to be generated from the test data set')
 cmd:option('-initialLR', 0.0000035, 'The learning rate to be used for the first few epochs of training')
-cmd:option('-lr', 0.000085, 'The learning rate: Any positive decimal value')
+cmd:option('-lr', 0.000085, 'The learning rate')
 cmd:option('-lrDecay', 0.98, 'The rate to aneal the learning rate')
-cmd:option('-maxEpochs', 60, 'The maximum number of epochs: Any positive real number')
-cmd:option('-dropoutNet', 0, 'Set to 1 to drop 15 to 18 views during training')
-cmd:option('-VpToKeep', 100, 'Drops all VPs except this one. The valid range is [0 ... opt.numVPs]. Set it to > opt.numVPs to ignore')
-cmd:option('-silhouetteInput', 0, 'Indicates whether only the masks (silhouettes) must be used for training')
-cmd:option('-singleVPNet', 1, 'If set to 1, will perform random permutation on the input vector view point channels')
-cmd:option('-conditional', 1, 'Indicates whether the model is trained conditionally')
-cmd:option('-KLD', 72, 'The coefficient for the gradients of the KLD loss')
+cmd:option('-maxEpochs', 80, 'The maximum number of epochs')
+cmd:option('-tanh', 0, "Set to 1 if you want to normalize the input/output values to be between -1 and 1 instead of 0 to 1")
 -- Testing:
-cmd:option('-modelPath', '', 'The path to load a model an start doing experiments with it: 0 | 1')
-cmd:option('-canvasHW', 5, 'Determines the height and width of the canvas on which the samples from the manifold will be shown on')
-cmd:option('-nSamples', 2, 'Number of sets of samples to be drawn from the prior (z), for each category (if conditional)')
-cmd:option('-sampleType', 'random', 'Determines the number of latent variables: data | random')
+cmd:option('-canvasHW', 5, 'Determines the height and width of the canvas on which the sample sets will be shown on')
+cmd:option('-nSamples', 2, 'Number of sets of samples to be drawn from the prior/empirical distribution, for each category (if conditional)')
+cmd:option('-manifoldExp', 'randomSampling', 'The experiment to be performed on the manifold : randomSampling, interpolation')
 cmd:option('-mean', 0, 'The mean on the z vector elements: Any real number')
-cmd:option('-var', 1, 'The variance of the z vector elements. In case sampleType = data then it indicates the ratio by which the predicted model variance will be multiplied by: Any positive real number')
+cmd:option('-var', 1, 'The variance of the z vector elements. In case manifoldExp = data then it indicates the ratio by which the predicted model variance will be multiplied by: Any positive real number')
 -- Experiments
-cmd:option('-experiment', 0, 'Wether we are going to only run experiments on a pre-trained model')
+cmd:option('-experiment', 0, "Set to 1 to run experiments on a pre-trained model from epoch 'opt.fromEpoch'")
 cmd:option('-expType', 'sample', 'Indicates the type of experiment to be performed')
 cmd:option('-forwardPassType', '', 'Indicates the type of experiment to be performed: userData | nyud | randomReconstruction | reconstructAllSamples')
-cmd:option('-fromEpoch', 26, 'The model from which epoch should be loaded and used')
-cmd:option('-sampleCategory', '', "The category name from which one would like to start generating samples. E.g. 'chair, car, airplane'. If empty, the conditional models will generate samples for all categories in the data set. Will be used if opt.sampleType == 'data': A valid category name for which there are examples in the train data set")
+cmd:option('-fromEpoch', 80, 'The epoch from which a pre-trained model will be loaded and used for experiments')
+cmd:option('-sampleCategory', '', "The category names for which conditional generating samples will be generated or interpolation will be done. E.g. 'chair, car, airplane'")
 cmd:option('-extraDataPath', '', "Path to silhouettes or NYUD data set images")
 cmd:option('-allViewsExp', 0, 'Indicates whether the all views experiment is going to be done for SingleVPNet models')
 cmd:option('-maxNumOfRecons', 0, "Determines how many training or test samples should be reconstructed when opt.forwardPasstype == 'reconstructAllSamples'. Set to 0 to get the reconstruction for all samples")
+cmd:option('-VpToKeep', 100, 'Drops all VPs except this one. The valid range is [1 ... opt.numVPs]. Set to a number greater than opt.numVPs to ignore')
 cmd:option('-getLatentDist', 0, '')
 
 cmd:text()
 opt = cmd:parse(arg or {})
 
 if opt.zip == 1 then opt.zip = true elseif opt.zip == 0 then opt.zip = false else print "==> Incorrect value for zip argument. Acceptables: 0 or 1" os.exit() end
-if opt.randPerm == 1 then opt.randPerm = true elseif opt.randPerm == 0 then	opt.randPerm = false else print "==> Incorrect value for 'randPerm' argument. Acceptables: 0 or 1" os.exit() end
 if opt.fromScratch == 1 then opt.fromScratch = true elseif opt.fromScratch == 0 then opt.fromScratch = false else print "==> Incorrect value for 'fromScratch' argument. Acceptables: 0 or 1" os.exit() end
-if opt.testPhase == 1 then opt.testPhase = true elseif opt.testPhase == 0 then opt.testPhase = false else print "==> Incorrect value for 'testPhase' argument" os.exit() end
+if opt.testPhase == 1 then opt.testPhase = true print '==> The code is running in test mode. To switch to normal model set testPhase to 0 when inputting the arguments.' elseif opt.testPhase == 0 then opt.testPhase = false else print "==> Incorrect value for 'testPhase' argument" os.exit() end
 if opt.benchmark == 1 then opt.benchmark = true elseif opt.benchmark == 0 then opt.benchmark = false else print "==> Incorrect value for 'benchmark' argument" os.exit() end
 if opt.tanh == 1 then opt.tanh = true elseif opt.tanh == 0 then opt.tanh = false else print "==> Incorrect value for 'tanh' argument" os.exit() end
 if opt.dropoutNet == 1 then opt.dropoutNet = true opt.VpToKeep = opt.VpToKeep + 1 elseif opt.dropoutNet == 0 then opt.dropoutNet = false opt.VpToKeep = 30 else print "==> Incorrect value for dropoutNet argument" os.exit() end
@@ -83,6 +80,11 @@ if opt.conditional == 1 then opt.conditional = true elseif opt.conditional == 0 
 if opt.batchSize < 2 then print '==> The batch size cannot be less than 2 for technical reasons. Batch size was set to 2' opt.batchSize = 2 end
 if opt.experiment == 1 then opt.experiment = true if not opt.dropVPs then opt.VpToKeep = opt.VpToKeep + 1 end elseif opt.experiment == 0 then opt.experiment = false opt.expType = nil else print "==> Incorrect value for 'experiment' argument" os.exit() end
 if opt.allViewsExp == 1 then opt.allViewsExp = true elseif opt.allViewsExp == 0 then opt.allViewsExp = false else print "==> Incorrect value for 'allViewsExp' argument" os.exit() end
+if opt.train == 1 then opt.train = true elseif opt.train == 0 then opt.train = false else print "==> Incorrect value for 'train' argument" os.exit() end
+
+if opt.benchmark then
+	opt.KLD = 80 -- Use lower KLD gradient coefficient for ModelNet40
+end
 
 if opt.sampleCategory ~= '' then
 	local temp = {}
@@ -112,7 +114,9 @@ if not opt.experiment then
 	if opt.zip or opt.fromScratch then
 		dofile('1_dataLoader.lua')
 	end
-	dofile('2_train.lua')
+	if opt.train then
+		dofile('2_train.lua')
+	end
 elseif opt.experiment and opt.experiment == true then
 	dofile('4_0_runExps.lua')
 end

@@ -1,6 +1,5 @@
---[[
-Place the commonly-used functions here
---]]
+-- Place the frequently-used functions here
+
 require 'paths'
 require 'torch'
 
@@ -82,6 +81,22 @@ function commonFuncs.randPermTableElements(table)
 		table = tempTable
 	end
 	return table
+end
+
+function commonFuncs.memoryPerSampleImage(imgSize, dataTypeNumBytes)
+	
+	-- Computes how much memory (in MBs) will be required for one of the images in the data set
+
+	local totalSizeOnMem = 0 -- In MBs
+	if imgSize:size() == 3 then
+		totalSizeOnMem = imgSize[2] * imgSize[3] * dataTypeNumBytes / 1024 / 1024		
+	elseif imgSize:size() == 2 then
+		totalSizeOnMem = imgSize[1] * imgSize[2] * dataTypeNumBytes / 1024 / 1024
+	else
+		totalSizeOnMem = imgSize() * dataTypeNumBytes  / 1024 / 1024
+	end
+
+	return totalSizeOnMem
 end
 
 function commonFuncs.getFreeMemory(ratio)
@@ -345,9 +360,9 @@ function commonFuncs.normalizeBackToZeroToOne(data, inPlace)
 	return dataTemp
 end
 
-function commonFuncs.dropInputVPs(inputTensor, VpToKeep, markInputDepthAndMask, numDropVPs, dropIndices, singleVPNet, pickedVPs, conditionHotVec)
-	-- Takes a tensor of size M x numVPs x originalImgSize x originalImgSize as input and randomly zeros-out 15-18 of the sub-tensors on dimension two
-	-- In case inputTensor was a table, the first entry contains depth images and the second one the silhouettes
+function commonFuncs.dropInputVPs(inputTensor, markInputDepthAndMask, dropoutNet, numDropVPs, dropIndices, singleVPNet, pickedVPs, conditionHotVec)
+	-- This function randomly zeros-out 15-18 of the viewpoints for DropoutNet or all viewpoints except one for SingleVPNet
+	-- inputTensor could be a table with two elements (each being a tensor) and the same operations will be done on both
 	-- if markInputDepthAndMask == true then the view points of the original depth maps and silhouettes will be marked by a small white square on their top-right corners
 	-- Only set markInputDepthAndMask to 'true' when not doing training or validaion and only if you want to store the dropped input data on disk
 
@@ -356,9 +371,8 @@ function commonFuncs.dropInputVPs(inputTensor, VpToKeep, markInputDepthAndMask, 
 	if type(inputTensor) == 'table' then droppedSilhouettesTensor = inputTensor[2]:clone() end
 	local numVPs = droppedDepthTensor:size(2)
 
-	-- VpToKeep is either between [0-19] or is an invalid number ( > 19 )
 	local flag = false
-	if VpToKeep and VpToKeep > numVPs and not singleVPNet then
+	if dropoutNet then
 		for i=1, droppedDepthTensor:size(1) do
 			if flag or not dropIndices or dropIndices:sum() == 0 then
 				if not numDropVPs then flag = true numDropVPs = torch.Tensor(1) end
@@ -382,66 +396,53 @@ function commonFuncs.dropInputVPs(inputTensor, VpToKeep, markInputDepthAndMask, 
 				end
 			end
 		end
-	elseif VpToKeep and VpToKeep <= numVPs or singleVPNet == true then
-		local tempDepthVP
+	elseif singleVPNet then
 		local flag = false
 		if not pickedVPs then pickedVPs = torch.zeros(1) else flag = true end
-		if not singleVPNet then
-			tempDepthVP = droppedDepthTensor[{{}, {VpToKeep}}]:clone()
-		else
-			tempDepthVP = torch.zeros(droppedDepthTensor:size(1), 1, droppedDepthTensor:size(3), droppedDepthTensor:size(4)):type(droppedDepthTensor:type())
-			local pickVP
-			for i=1, droppedDepthTensor:size(1) do
-				if not flag then
-					pickVP = torch.random(1, numVPs)
-					pickedVPs = torch.cat(pickedVPs, torch.Tensor(1):fill(pickVP), 1)
-				else
-					pickVP = pickedVPs[1]
-				end
-				tempDepthVP[{{i}, {1}}] = droppedDepthTensor[{i, {pickVP}}]:clone()
+		local tempDepthVP = torch.zeros(droppedDepthTensor:size(1), 1, droppedDepthTensor:size(3), droppedDepthTensor:size(4)):type(droppedDepthTensor:type())
+		local pickVP
+		for i=1, droppedDepthTensor:size(1) do
+			if not flag then
+				pickVP = torch.random(1, numVPs)
+				pickedVPs = torch.cat(pickedVPs, torch.Tensor(1):fill(pickVP), 1)
+			else
+				pickVP = pickedVPs[1]
 			end
-			if not flag then pickedVPs = pickedVPs[{{2, pickedVPs:size(1)}}] end
-			VpToKeep = 1
+			tempDepthVP[{{i}, {1}}] = droppedDepthTensor[{i, {pickVP}}]:clone()
 		end
+		if not flag then pickedVPs = pickedVPs[{{2, pickedVPs:size(1)}}] end
 		local tempMaskVP
 		if singleVPNet then
 			droppedDepthTensor = torch.Tensor(droppedDepthTensor:size(1), 1, droppedDepthTensor:size(3), droppedDepthTensor:size(4)):type(droppedDepthTensor:type())
 		else
 			droppedDepthTensor:zero()
 		end
-		droppedDepthTensor[{{}, {VpToKeep}}]:copy(tempDepthVP)
+		droppedDepthTensor[{{}, {1}}]:copy(tempDepthVP)
 		tempDepthVP = nil
 
 		if type(inputTensor) == 'table' then
-			if not singleVPNet then
-				tempMaskVP = droppedSilhouettesTensor[{{}, {VpToKeep}}]:clone()
-			else
-				tempMaskVP = torch.zeros(droppedDepthTensor:size(1), 1, droppedDepthTensor:size(3), droppedDepthTensor:size(4)):type(droppedDepthTensor:type())
-				local pickVP
-				for i=1, droppedDepthTensor:size(1) do
-					pickVP = not flag and pickedVPs[i] or pickedVPs[1]
-					tempMaskVP[{{i}, {1}}] = droppedSilhouettesTensor[{i, {pickVP}}]:clone()
-				end
+
+			tempMaskVP = torch.zeros(droppedDepthTensor:size(1), 1, droppedDepthTensor:size(3), droppedDepthTensor:size(4)):type(droppedDepthTensor:type())
+			local pickVP
+			for i=1, droppedDepthTensor:size(1) do
+				pickVP = not flag and pickedVPs[i] or pickedVPs[1]
+				tempMaskVP[{{i}, {1}}] = droppedSilhouettesTensor[{i, {pickVP}}]:clone()
 			end
-			if singleVPNet then
-				droppedSilhouettesTensor = torch.Tensor(droppedSilhouettesTensor:size(1), 1, droppedSilhouettesTensor:size(3), droppedSilhouettesTensor:size(4)):type(droppedSilhouettesTensor:type())
-			else
-				droppedSilhouettesTensor:zero()
-			end
-			droppedSilhouettesTensor[{{}, {VpToKeep}}]:copy(tempMaskVP)
+			droppedSilhouettesTensor = torch.Tensor(droppedSilhouettesTensor:size(1), 1, droppedSilhouettesTensor:size(3), droppedSilhouettesTensor:size(4)):type(droppedSilhouettesTensor:type())
+			droppedSilhouettesTensor[{{}, {1}}]:copy(tempMaskVP)
 			tempMaskVP = nil
 		end
 		
 		if markInputDepthAndMask then
-			if not singleVPNet then
+			for i=1, droppedDepthTensor:size(1) do
 				for j=1, ((type(inputTensor) ~= 'table' and inputTensor:size():size() == 4) and inputTensor:size(2) or inputTensor[1]:size():size() == 4 and inputTensor[1]:size(2)) or type(inputTensor) ~= 'table' and inputTensor:size(1) or inputTensor[1]:size(1) do
-					if VpToKeep <= numVPs and j ~= VpToKeep then
+					if j ~= (not flag and pickedVPs[i] or pickedVPs[1]) then
 						if type(inputTensor) ~= 'table' and inputTensor:size():size() == 4 or inputTensor[1]:size():size() == 4 then
 							if type(inputTensor) ~= 'table' then
-								inputTensor[{{}, {j}, {1, 20}, {1, 20}}] = 1
+								inputTensor[{{i}, {j}, {1, 20}, {1, 20}}] = 1
 							else
-								inputTensor[1][{{}, {j}, {1, 20}, {1, 20}}] = 1
-								inputTensor[2][{{}, {j}, {1, 20}, {1, 20}}] = 1
+								inputTensor[1][{{i}, {j}, {1, 20}, {1, 20}}] = 1
+								inputTensor[2][{{i}, {j}, {1, 20}, {1, 20}}] = 1
 							end
 						else
 							if type(inputTensor) ~= 'table' then
@@ -449,28 +450,6 @@ function commonFuncs.dropInputVPs(inputTensor, VpToKeep, markInputDepthAndMask, 
 							else
 								inputTensor[1][{{j}, {1, 20}, {1, 20}}] = 1
 								inputTensor[2][{{j}, {1, 20}, {1, 20}}] = 1
-							end
-						end
-					end
-				end
-			else
-				for i=1, droppedDepthTensor:size(1) do
-					for j=1, ((type(inputTensor) ~= 'table' and inputTensor:size():size() == 4) and inputTensor:size(2) or inputTensor[1]:size():size() == 4 and inputTensor[1]:size(2)) or type(inputTensor) ~= 'table' and inputTensor:size(1) or inputTensor[1]:size(1) do
-						if j ~= (not flag and pickedVPs[i] or pickedVPs[1]) then
-							if type(inputTensor) ~= 'table' and inputTensor:size():size() == 4 or inputTensor[1]:size():size() == 4 then
-								if type(inputTensor) ~= 'table' then
-									inputTensor[{{i}, {j}, {1, 20}, {1, 20}}] = 1
-								else
-									inputTensor[1][{{i}, {j}, {1, 20}, {1, 20}}] = 1
-									inputTensor[2][{{i}, {j}, {1, 20}, {1, 20}}] = 1
-								end
-							else
-								if type(inputTensor) ~= 'table' then
-									inputTensor[{{j}, {1, 20}, {1, 20}}] = 1
-								else
-									inputTensor[1][{{j}, {1, 20}, {1, 20}}] = 1
-									inputTensor[2][{{j}, {1, 20}, {1, 20}}] = 1
-								end
 							end
 						end
 					end
@@ -567,36 +546,31 @@ end
 
 function commonFuncs.loadExtraData(path, forwardType, numVPs)
 
-
-	local silTensor, depthTensor, rgbTensor
+	local imagesTensor, depthTensor, rgbTensor
 	local filePaths = commonFuncs.getFileNames(path)
 	local imgSize = image.load(filePaths[1]):size(3)
 	if forwardType == 'userData' then
-		silTensor = torch.zeros(#filePaths, 1, imgSize, imgSize)
-		local temp = silTensor:gt(0.12)
-		silTensor[silTensor:lt(0.12)] = 1
-		silTensor[temp] = 0
-		return silTensor
+		imagesTensor = torch.Tensor(#filePaths, 1, imgSize, imgSize)
+		for i=1, #filePaths do
+			local tempImg = image.load(filePaths[i], 1)
+			tempImg[tempImg:gt(0)] = 1
+			imagesTensor[i]:copy(tempImg)
+		end
+		-- local temp = imagesTensor:gt(0.12)
+		-- imagesTensor[imagesTensor:lt(0.12)] = 1
+		-- imagesTensor[temp] = 0
+		return imagesTensor
 	elseif forwardType == 'nyud' then
-		silTensor = torch.Tensor(#filePaths/3, 1, imgSize, imgSize)
+		imagesTensor = torch.Tensor(#filePaths/3, 1, imgSize, imgSize)
 		depthTensor = torch.Tensor(#filePaths/3, 1, imgSize, imgSize)
 		rgbTensor = torch.Tensor(#filePaths/3, 3, imgSize, imgSize)
 		for i=1, #filePaths/3 do
 			local tempSil = image.load(filePaths[3*(i-1)+2], 1)
 
 			depthTensor[i][1] = image.load(filePaths[3*(i-1)+1], 1)[{{1, 224}, {1, 224}}]
-			silTensor[i][1]:copy(tempSil:size():size(1) == 3 and tempSil[1][{{1, 224}, {1, 224}}] or tempSil[{{1, 224}, {1, 224}}])
+			imagesTensor[i][1]:copy(tempSil:size():size(1) == 3 and tempSil[1][{{1, 224}, {1, 224}}] or tempSil[{{1, 224}, {1, 224}}])
 			rgbTensor[i] = image.load(filePaths[3*(i-1)+3])[{{}, {1, 224}, {1, 224}}]
 		end
-		return {depthTensor, silTensor, rgbTensor}
-	elseif forwardType == 'completion' then
-		local filePaths = commonFuncs.getFileNames(path)
-		local depthTensor = torch.zeros(#filePaths/numVPs, numVPs, imgSize, imgSize)
-
-		for i=1, #filePaths do
-			depthTensor[math.ceil(i/numVPs)][(i%numVPs) ~=0 and (i%numVPs) or numVPs] = image.load(filePaths[i], 1)
-		end
-		return depthTensor
 	end
 end
 
@@ -625,19 +599,6 @@ function commonFuncs.getEncodings(inputTensor, encoderModel, sampler, conditiona
 	encodedSample = torch.cat(encodedSample[1][{{1}}], encodedSample[2][{{1}}], 2)
 	inputTensor = nil
 	return conditional and {encodedSample, predictedClassScores} or {encodedSample}
-
-	-- if conditional then
-	-- 	encodedSample = {encodedSample[1], encodedSample[2]}
-	-- end
-	-- local Z = sampler:forward(encodedSample)[{{1}}]
-	-- for i=1, 4 do
-	-- 	Z = torch.cat(Z, sampler:forward(encodedSample)[{{1}}], 1)
-	-- end
-	-- Z = Z:mean(1)
-
-	-- inputTensor = nil
-
-	-- return Z
 end
 
 function commonFuncs.getNumOfSamplesToViz(allSamplesPath)
@@ -698,7 +659,7 @@ function commonFuncs.show_scatter_plot(method, mapped_x, labels, numCats, catego
    gnuplot.movelegend('left', 'middle')
    gnuplot.axis('auto')
    gnuplot.title(method)
-   gnuplot.raw('set term svg size 4096, 4096')
+   gnuplot.raw('set term svg size 5000, 5000')
    gnuplot.plot(mapped_data)
    gnuplot.plotflush()
 
@@ -708,7 +669,7 @@ function commonFuncs.show_scatter_plot(method, mapped_x, labels, numCats, catego
    gnuplot.movelegend('left', 'middle')
    gnuplot.axis('auto')
    gnuplot.title(method)
-   gnuplot.raw('set term png size 4096, 4096')
+   gnuplot.raw('set term png size 5000, 5000')
    gnuplot.plot(mapped_data)
    gnuplot.plotflush()
 end

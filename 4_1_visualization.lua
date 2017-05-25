@@ -2,20 +2,14 @@ require 'paths'
 require 'sys'
 
 
---[[
-To visualize the results of the neural network model you first need to compile
-
---]]
-
 cmd = torch.CmdLine()
 cmd:text()
 cmd:text('Options:')
-cmd:option('-inputDir', '', "The directory to read the data from. The input directory contains other directories for each category. The category directories contain reconstructions")
+cmd:option('-inputDir', '', "The directory to read the results from. The input directory contains other directories for each category (e.g. airplane, car etc).")
 cmd:option('-outputDir', '', "The directory to output the .ply files")
-cmd:option('-mode', '', "Available options: reconstruction, sampling, interpolation")
+cmd:option('-resultType', '', "Available options: reconstruction, sampling, interpolation, NN") -- NN is used for the results obtained after running the nearest neighbor experiment on conditional or unconditional samples
 cmd:option('-res', 224, "Grid size resolution")
-cmd:option('-maskThreshold', 0.01, "The threshold to use the silhouettes to filter out the noise")
-cmd:option('-conditional', 0, "Set to 1 for visualizing samples obtained from a conditional model")
+cmd:option('-maskThreshold', 0.5, "The threshold to be used for filtering out the noise using the produced silhouettes")
 cmd:text()
 opt = cmd:parse(arg or {})
 
@@ -41,14 +35,17 @@ local function splitTxt(inputStr, sep)
         return t
 end
 
-if opt.mode ~= 'reconstruction' and opt.mode ~= 'sampling' and opt.mode ~= 'interpolation' then
+
+if opt.resultType ~= 'reconstruction' and opt.resultType ~= 'sampling' and opt.resultType ~= 'interpolation' and opt.resultType ~= 'NN' then
 	print "reconType argument is invalid. Please give either of the options 'reconstruction', 'sampling' or 'interpolation'"
 	os.exit()
 end
+
 if opt.inputDir == '' then
-	print "Please specify the input directory"
+	print ('Please specify the results directory')
 	os.exit()
 end
+
 local outputDirName = '/3DReconstructions'
 if opt.outputDir == '' then
 	opt.outputDir = opt.inputDir .. outputDirName
@@ -60,26 +57,57 @@ else
 	outputDirName = outputDirName[#outputDirName]
 end
 
+if not paths.filep('depthReconstruction') then
+	print ("Make sure you have complied the code in /depth_render_reconstruction/code/depthReconstruction_Ubuntu/depthReconstruction and place the built executable file 'depthReconstruction' in '" .. paths.cwd() .. "' directory")
+	os.exit()
+end
+
+if not paths.filep('camPosList.txt') then
+	print ("Make sure 'camPosList.txt' has been copied into '" .. paths.cwd() .. "' directory")
+	os.exit()
+end
+
+
 
 local dirs = getFileNames(opt.inputDir)
+local totalSamples = 0
 local ticTotal = torch.tic()
 for i=1, #dirs do
 	local catName = splitTxt(dirs[i], '/')
+	local catSamples = 0
 	catName = catName[#catName]
 	if catName ~= outputDirName then
-		print ("==> Generating 3D reconstructions for the category: " .. catName)
+		print ("==> Fusing the generated depth maps and silhouettes to obtain final point cloud reconstructions for the category: " .. catName)
 		local subDirs = getFileNames(dirs[i])
 		local ticCat = torch.tic()
-		for j=1, #subDirs do
-			subDirs[j] = splitTxt(subDirs[j], '/')
-			subDirs[j] = dirs[i] .. '/' .. subDirs[j][#subDirs[j]]
-			local modelName = splitTxt(subDirs[j], '/')
-			modelName = modelName[#modelName]
-			paths.mkdir(opt.outputDir .. '/' .. catName .. '/' .. modelName)
-			os.execute("./depthReconstruction -input '" .. subDirs[j] .. "' -output '" .. opt.outputDir .. '/' .. catName .. '/' .. modelName .. "' -resolution " .. opt.res .. " -" .. opt.mode .. " -mask " .. opt.maskThreshold .. " >/dev/null 2>&1")
+		for j=1, opt.resultType == 'NN' and #subDirs or 1 do
+			catSamples = catSamples + 1
+			totalSamples = totalSamples + 1
+			local subSubDirs = opt.resultType ~= 'NN' and subDirs or getFileNames(subDirs[j])
+			for k=1, #subSubDirs do
+				subSubDirs[k] = splitTxt(subSubDirs[k], '/')
+				subSubDirs[k] = dirs[i] .. '/' .. (opt.resultType == 'NN' and subSubDirs[k][#subSubDirs[k] - 1] .. '/' or '') .. subSubDirs[k][#subSubDirs[k]]
+				local splitDirNames = splitTxt(subSubDirs[k], '/')
+				if string.match(splitDirNames[#splitDirNames], 'nearest') then
+					nearestRecon = true
+					subSubSubDirs = getFileNames(getFileNames(subDirs[j])[1])
+					for l=1, #subSubSubDirs do
+						if string.match(subSubSubDirs[l], 'nearestRecon') then
+							nearestReconDir = subSubSubDirs[l]
+						end
+					end
+				else
+					nearestRecon = false
+				end
+				for l=1, nearestRecon and 2 or 1 do
+					local reconDirName = (opt.resultType == 'NN' and splitDirNames[#splitDirNames - 1] or '') ..  '/' .. splitDirNames[#splitDirNames] .. (l == 2 and '/nearestRecon' or '')
+					paths.mkdir(opt.outputDir .. '/' .. catName .. '/' .. reconDirName)
+					os.execute("./depthReconstruction -input '" .. (l == 1 and subSubDirs[k] or nearestReconDir) .. "' -output '" .. opt.outputDir .. '/' .. catName .. '/' .. reconDirName .. "' -resolution " .. opt.res .. " -" .. (opt.resultType ~= 'NN' and opt.resultType or 'reconstruction') .. " -mask " .. opt.maskThreshold .. " >/dev/null 2>&1")
+				end
+			end
 		end
-		print(string.format("==> Done with getting 3D reconstruction for %s. Time took: %.1f minutes", catName, torch.toc(ticCat)/60)
+		print(string.format("==> Done with getting 3D reconstruction for %s. No of samples: %d. Time took: %.1f minutes", catName, catSamples, torch.toc(ticCat)/60))
 		sys.sleep(5)
 	end
-	print(string.format("==> Done with getting all 3D reconstruction. Total time: %.1f minutes", torch.toc(ticTotal)/60)
 end
+print(string.format("==> Done with creating all 3D reconstructions. No of total samples: %d. Total time: %.1f minutes", totalSamples, torch.toc(ticTotal)/60))
