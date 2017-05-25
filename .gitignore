@@ -1,7 +1,5 @@
-/Data
-/ExtraData
 /images*
 /save*
 *.png
-*.lua~
+*.~
 *.t7
