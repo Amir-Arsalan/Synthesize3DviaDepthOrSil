@@ -19,7 +19,7 @@ This repository provides a Torch implementation of the framework proposed by Sol
 - [cudnn v5.1 or higher](https://developer.nvidia.com/cudnn)
 
 ## Hardware Requirements
-We recommend using a machine with ~200GBs of free storage (~60GBs if you're using [ModelNet40](http://3dshapenets.cs.princeton.edu/)), ~10GBs of memory and a GPU with ~5GBs of memory with the default arguments. You will need less than 2GBs of free GPU memory when using the model for running experiments (`4_0_runExps.lua`). More than 25% of the time require for each epoch is spent on read operations from disk; so an SSD drive will help here. GPU memory requirement could be reduced by setting`nCh` to a smaller value. Memory requirement could be reduced by setting `maxMemory` to a smaller value.
+We recommend using a machine with ~200GBs of free storage (~60GBs if you're using [ModelNet40](http://3dshapenets.cs.princeton.edu/)), ~10GBs of memory and a GPU with ~5GBs of memory with the default arguments. You will need less than 2GBs of free GPU memory when using the model for running experiments (`4_0_runExps.lua`). GPU memory and RAM requirement could be reduced by setting`nCh` and `maxMemory` to a smaller values respectively.
 
 # Running
 
@@ -28,9 +28,9 @@ Use `main.lua` to train new models or run experiments for a pre-trained model. B
 - `benchmark`: Set to `1` if you want to use a benchmark data set (E.g. ModelNet40 here)
 - `fromScratch`: If set to `1` the code will load the 2D images to Torch tensors and save them onto disk. Make sure you have unzipped the contents of the `.zip` files either manually or via running the code with the `zip` argument set to `1`
 - `modelDirName`: Name of the directory to save model and results of each run of the code
-- `dropoutNet`: Set to `1` to train/use `dropOutNet` model
-- `singleVPNet`: Set to `1` to train/use a `singleVPNet` model 
-- `conditional`: Set to `1` if you want to train/use a conditional model
+- `dropoutNet`: Set to `1` to train or use a pre-trained `DropOutNet` model
+- `singleVPNet`: Set to `1` to trainor or use a pre-trained `SingleVPNet` model 
+- `conditional`: Set to `1` for conditional models
 - `silhouetteInput`: Set to `1` to use silhouettes for training/testing
 - `KLD`: The KLD term's gradient coefficient
 - `experiment`: Set to `0` when you want to train a model and to `1` when you want to use a pre-trained model
