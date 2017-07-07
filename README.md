@@ -19,7 +19,7 @@ This repository provides a Torch implementation of the framework proposed by Sol
 - [cudnn v5.1 or higher](https://developer.nvidia.com/cudnn)
 
 ## Hardware Requirements
-We recommend using a machine with ~200GBs of free storage (~60GBs if you're using [ModelNet40](http://3dshapenets.cs.princeton.edu/)), ~10GBs of memory and a GPU with ~5GBs of memory with the default arguments. You will need less than 2GBs of free GPU memory when using the model for running experiments (`4_0_runExps.lua`). GPU memory and RAM requirement could be reduced by setting`nCh` and `maxMemory` to a smaller values respectively.
+We recommend using a machine with ~200GBs of free storage (~60GBs if you're using [ModelNet40](http://3dshapenets.cs.princeton.edu/)), ~10GBs of memory and a GPU with ~5GBs of memory with the default arguments. You will need less than 2GBs of free GPU memory when using the model for running experiments (`4_0_runExps.lua`). GPU memory and RAM requirement could be reduced by setting `nCh` and `maxMemory` arguments to a smaller values respectively.
 
 # Running
 
