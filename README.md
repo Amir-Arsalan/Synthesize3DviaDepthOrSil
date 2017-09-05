@@ -47,14 +47,14 @@ You can download the pre-rendered data sets for both [ShapNet Core](https://www.
     th main.lua -zip 1 -fromScratch 1 -maxMemory 3000 -train 0
 
 ### Rendering viewpoints
-If you want to create your own data set you can use the rendering code provided in `/depth_render_reconstruction/code/other/scriptRender/`. You need to have `meshlab server` installed. When rendering view points to create your data set make sure you follow the following pattern for creating your .zip files:
+If you want to create your own data set you can use the rendering code provided in `/depth_render_reconstruction/code/renderDepth/`. The obj/ply files names should be in `model_x` format where `x` could be any integer. You need to have install Microsoft Visual C++ 2013 Redistributable. After rendering view points to create your data set make sure you follow the following pattern for creating your .zip files:
 
     CategoryName.zip
     └── CategoryName_depth_[rgb/float]
-        ├── model_xxxx_Cam_0.jpg 
-        ├── model_xxxx_Cam_0.jpg
+        ├── model_x_Cam_0.jpg 
+        ├── model_x_Cam_0.jpg
         ├── ...
-        └── model_xxxx_Cam_19.jpg
+        └── model_x_Cam_19.jpg
 
 ## Training:
 Here are a few examples on how to train different models. The models will be trained on the ShapeNet core data set unless you set `benchmark` to `1`:
