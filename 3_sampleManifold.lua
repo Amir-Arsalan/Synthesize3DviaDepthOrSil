@@ -8,15 +8,15 @@ local commonFuncs = require '0_commonFuncs'
 
 
 local sampleManifold = {}
-function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, data, model, mainOutputDirPath, mean, var, nLatents, imgSize, numVPs, epoch, batchSize, targetBatchSize, testPhase, tanh, dropoutNet, VpToKeep, silhouetteInput, sampleZembeddings, singleVPNet, conditional, expType, benchmark)
+function sampleManifold.sample(manifoldExp, sampleCategory, canvasHW, nSamples, data, model, outputDirPath, mean, var, nLatents, imgSize, numVPs, epoch, batchSize, targetBatchSize, testPhase, tanh, dropoutNet, VpToKeep, silhouetteInput, zEmbeddings, singleVPNet, conditional, expType, benchmark)
     local conditionalModel = conditional and 1 or 0
     if not expType or expType == 'randomSampling' then
-        print ('==> Drawing ' .. (conditional and ' conditional random ' or 'random') .. ' samples. Configs: ' .. 'Num of Sample Sets: ' .. nSamples .. ', Canvas Size: ' .. canvasHW .. ' x ' .. canvasHW .. (sampleZembeddings and ', Empirical Mean' or (', Mean: ' .. mean))  .. (sampleZembeddings and ', Empirical Var' or (', Diag. Var: ' .. var)))
+        print ('==> Drawing ' .. (conditional and ' conditional random ' or 'random') .. ' samples. Configs: ' .. 'Num of Sample Sets: ' .. nSamples .. ', Canvas Size: ' .. canvasHW .. ' x ' .. canvasHW .. (zEmbeddings and ', Empirical Mean' or (', Mean: ' .. mean))  .. (zEmbeddings and ', Empirical Var' or (', Diag. Var: ' .. var)))
         expDirName = conditional and 'conditionalSamples' or 'randomSamples'
-        if not sampleZembeddings then
-            paths.mkdir(string.format('%s/%s-Mean_%.2f-Var_%.2f/', mainOutputDirPath, expDirName, mean, var))
+        if not zEmbeddings then
+            paths.mkdir(string.format('%s/%s-Mean_%.2f-Var_%.2f/', outputDirPath, expDirName, mean, var))
         else
-            paths.mkdir(string.format('%s/%s-empirical/', mainOutputDirPath, expDirName))
+            paths.mkdir(string.format('%s/%s-empirical/', outputDirPath, expDirName))
         end
         local canvasSize = (not expType and conditional and canvasHW - 1) or canvasHW
         local meanVec = torch.Tensor(1, nLatents):fill(mean)
@@ -36,25 +36,41 @@ function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, d
             end
             if allowSampleForCategory or sampleCategory == '' or not expType then
                 if conditional then
-                    if not sampleZembeddings then
-                        savePathRandom = string.format('%s/%s-Mean_%.2f-Var_%.2f/%s/', mainOutputDirPath, expDirName, mean, var, data.category[c])
+                    if not zEmbeddings then
+                        savePathRandom = string.format('%s/%s-Mean_%.2f-Var_%.2f/%s/', outputDirPath, expDirName, mean, var, data.category[c])
                     else
-                        savePathRandom = string.format('%s/%s-empirical/%s/', mainOutputDirPath, expDirName, data.category[c])
+                        savePathRandom = string.format('%s/%s-empirical/%s/', outputDirPath, expDirName, data.category[c])
                     end
                 else
-                    if not sampleZembeddings then
-                        savePathRandom = string.format('%s/%s-Mean_%.2f-Var_%.2f/', mainOutputDirPath, expDirName, mean, var)
+                    if not zEmbeddings then
+                        savePathRandom = string.format('%s/%s-Mean_%.2f-Var_%.2f/', outputDirPath, expDirName, mean, var)
                     else
-                        savePathRandom = string.format('%s/%s-empirical/', mainOutputDirPath, expDirName)
+                        savePathRandom = string.format('%s/%s-empirical/', outputDirPath, expDirName)
                     end
                 end
                 for j=1, nSamples do
                     local counter = 1
                     local zVectors
-                    if not sampleZembeddings then
+                    if not zEmbeddings then
                         zVectors = commonFuncs.sampleDiagonalMVN(meanVec, diagLogVarianceVec, canvasSize ^ 2)
                     else
-                        zVectors = commonFuncs.sampleDiagonalMVN({sampleZembeddings[1]:mean(1):float(), sampleZembeddings[1]:var(1):log():float()}, {sampleZembeddings[2]:mean(1):float(), sampleZembeddings[2]:var(1):log():float()}, canvasSize ^ 2)
+                        local tempZEmbeddings = {}
+                        if conditional then
+                            -- Use the empirical distribution for each category samples in the training set
+                            local tempIndex = zEmbeddings[3]:eq(c):nonzero()
+                            tempIndex = tempIndex:view(tempIndex:size(1))
+                            tempZEmbeddings[1] = zEmbeddings[1]:index(1, tempIndex)
+                            tempZEmbeddings[2] = zEmbeddings[2]:index(1, tempIndex)
+
+                            -- tempZEmbeddings[1] = zEmbeddings[1]
+                            -- tempZEmbeddings[2] = zEmbeddings[2]
+
+                            tempZEmbeddings[2] = tempZEmbeddings[2]:exp():add(tempZEmbeddings[2].new():resizeAs(tempZEmbeddings[2]):rand(tempZEmbeddings[2]:size()):div(10)):log() -- Increase the variance for about 0.05 (~0.22 std)
+                        else
+                            tempZEmbeddings[1] = zEmbeddings[1]:clone()
+                            tempZEmbeddings[2] = zEmbeddings[2]:clone():exp():add(zEmbeddings[2].new():resizeAs(zEmbeddings[2]):rand(zEmbeddings[2]:size()):div(10)):log() -- Increase the variance for about 0.05 (~0.22 std)
+                        end
+                        zVectors = commonFuncs.sampleDiagonalMVN({tempZEmbeddings[1]:mean(1):float(), tempZEmbeddings[1]:var(1):log():float()}, {tempZEmbeddings[2]:clone():exp():mean(1):log():float(), tempZEmbeddings[2]:clone():exp():var(1):log():float()}, canvasSize ^ 2)
                     end
                     for i=1, canvasSize ^ 2 do
                         local z
@@ -104,9 +120,9 @@ function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, d
         collectgarbage()
     end
     if not expType or expType and expType == 'interpolation' then
-        expDirName = expType and 'interpolation' .. (commonFuncs.numOfDirs(mainOutputDirPath)+1 >= 1 and  commonFuncs.numOfDirs(mainOutputDirPath)+1 or 1) or 'interpolation' -- In case a directory has been created already, this will help putting the new results into a new directory
-        paths.mkdir(string.format('%s/%s/', mainOutputDirPath, expDirName))
-        local savePathDataInterpolate = string.format('%s/%s', mainOutputDirPath, expDirName)
+        expDirName = expType and 'interpolation' .. (commonFuncs.numOfDirs(outputDirPath)+1 >= 1 and  commonFuncs.numOfDirs(outputDirPath)+1 or 1) or 'interpolation' -- In case a directory has been created already, this will help putting the new results into a new directory
+        paths.mkdir(string.format('%s/%s/', outputDirPath, expDirName))
+        local savePathDataInterpolate = string.format('%s/%s', outputDirPath, expDirName)
         print ("==> Doing interpolation. Configs - Number of Samples: " .. nSamples - 2 .. ", Canvas Size: " .. canvasHW - 1 .. " X " .. canvasHW - 1)
         nSamples = nSamples - 1 --Just to save computation time
         canvasHW = canvasHW - 1 --Just to save computation time
@@ -228,7 +244,7 @@ function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, d
                                 interpolationsilhouetteCanvas = torch.Tensor(numVPs, canvasHW * imgSize, canvasHW * imgSize)
                                 local interpolationZVectors = torch.zeros(canvasHW ^ 2, nLatents)
                                 if l >= 2 then
-                                    if sampleType ~= 'data' then
+                                    if manifoldExp ~= 'data' then
                                         interpolationZVectors[{2}]:copy(zVecPrevExample)
                                         interpolationZVectors[{{3, canvasHW ^ 2 - 2}}]:copy(commonFuncs.interpolateZVectors(zVecPrevExample, zVectors[{{2}}], canvasHW ^ 2 - 4)) -- The minus 4 is there since for each depth map we have one original depth map, one reconstructed version of the same depth map before interpolation (both located on top left), one interpolation target reconstructed depth map along with its original depth map (located at the bottom right). Therefore, we require 4 less interpolated versions of Z vectors
                                         interpolationZVectors[{canvasHW ^ 2 - 1}]:copy(zVectors[{2}])
@@ -243,7 +259,7 @@ function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, d
                                         local zSamples = zVectors[{{j}}]:repeatTensor(2, 1)
                                         local zInterpolations = interpolationZVectors[{{j}}]:repeatTensor(2, 1)
                                         zSamples = zSamples:cuda() zInterpolations = zInterpolations:cuda()
-                                        if sampleType ~= 'interpolate' then 
+                                        if manifoldExp ~= 'interpolate' then 
                                             samplesReconstructions = model:get(conditionalModel+4):forward(zSamples)
                                             samplesSilhouettesReconstructions = samplesReconstructions[2]:clone():type(torch.getdefaulttensortype())
                                             samplesReconstructions[2] = nil
@@ -257,14 +273,14 @@ function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, d
                                         for k=1, numVPs do
 
 
-                                            if sampleType ~= 'interpolate' then
+                                            if manifoldExp ~= 'interpolate' then
                                                 canvas[{{k}, {1, dataBeingUsed:size(3)}, {1, dataBeingUsed:size(3)}}] = dataBeingUsed[{{l}, {k}}]:type(torch.getdefaulttensortype())
                                                 canvas[{{k}, {(counter-1) * imgSize + 1, counter * imgSize}, {(j - 1) % canvasHW * imgSize + 1, ((j - 1) % canvasHW + 1) * imgSize}}]:copy(samplesReconstructions[{1, k}]:type(torch.getdefaulttensortype()))
                                                 silhouetteCanvas[{{k}, {1, silhouettes:size(3)}, {1, silhouettes:size(3)}}]:copy(silhouettes[{{l}, {k}}])
                                                 silhouetteCanvas[{{k}, {(counter-1) * imgSize + 1, counter * imgSize}, {(j - 1) % canvasHW * imgSize + 1, ((j - 1) % canvasHW + 1) * imgSize}}]:copy(samplesSilhouettesReconstructions[{1, k}]:type(torch.getdefaulttensortype()))
                                             end
 
-                                            if sampleType ~= 'data' then
+                                            if manifoldExp ~= 'data' then
                                                 interpolationReconstructions = model:get(conditionalModel+4):forward(conditionalModel == 0 and zInterpolations or {zInterpolations, targetClassHotVec})
                                                 interpolationSilhouettesReconstructions = interpolationReconstructions[2]:clone():type(torch.getdefaulttensortype())
                                                 interpolationReconstructions[2] = nil
@@ -289,28 +305,28 @@ function sampleManifold.sample(sampleType, sampleCategory, canvasHW, nSamples, d
                                         collectgarbage()
                                     end
 
-                                    if sampleType ~= 'data' then
+                                    if manifoldExp ~= 'data' then
                                         for k=1, numVPs do
                                             interpolationCanvas[{{k}, {(counter-2) * imgSize + 1, (counter - 1) * imgSize}, {(canvasHW ^ 2 - 1) % canvasHW * imgSize + 1, ((canvasHW ^ 2 - 1) % canvasHW + 1) * imgSize}}] = dataBeingUsed[{{l}, {k}}]:type(torch.getdefaulttensortype())
                                             interpolationsilhouetteCanvas[{{k}, {(counter-2) * imgSize + 1, (counter - 1) * imgSize}, {(canvasHW ^ 2 - 1) % canvasHW * imgSize + 1, ((canvasHW ^ 2 - 1) % canvasHW + 1) * imgSize}}]:copy(silhouettes[{{l}, {k}}])
                                         end
                                     end
 
-                                    if sampleType ~= 'interpolate' then
+                                    if manifoldExp ~= 'interpolate' then
                                         paths.mkdir(string.format('%s/%s/example-%d/samples', savePathDataInterpolate, data.category[class], nTotalSamples - 1))
                                         paths.mkdir(string.format('%s/%s/example-%d/samples/mask', savePathDataInterpolate, data.category[class], nTotalSamples - 1))
                                     end
-                                    if sampleType ~= 'data' then
+                                    if manifoldExp ~= 'data' then
                                         paths.mkdir(string.format('%s/%s/example-%d/', savePathDataInterpolate, data.category[class], nTotalSamples - 1))
                                         paths.mkdir(string.format('%s/%s/example-%d//mask', savePathDataInterpolate, data.category[class], nTotalSamples - 1))
                                     end
                                     for k=1, numVPs do
                                         
-                                        if sampleType ~= 'interpolate' then
+                                        if manifoldExp ~= 'interpolate' then
                                             image.save(string.format(savePathDataInterpolate .. '/%s/example-%d/samples/VP-%d.png', data.category[class], nTotalSamples - 1, k-1), canvas[{k}])
                                             image.save(string.format(savePathDataInterpolate .. '/%s/example-%d/samples/mask/VP-%d.png', data.category[class], nTotalSamples - 1, k-1), silhouetteCanvas[{k}])
                                         end
-                                        if sampleType ~= 'data' then
+                                        if manifoldExp ~= 'data' then
                                             image.save(string.format(savePathDataInterpolate .. '/%s/example-%d/VP-%d.png', data.category[class], nTotalSamples - 1, k-1), interpolationCanvas[{k}])
                                             image.save(string.format(savePathDataInterpolate .. '/%s/example-%d/mask/VP-%d.png', data.category[class], nTotalSamples - 1, k-1), interpolationsilhouetteCanvas[{k}])
                                         end

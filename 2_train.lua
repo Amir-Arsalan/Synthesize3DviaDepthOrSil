@@ -32,18 +32,17 @@ if not opt then
     cmd:option('-imgSize', 60, 'The size of each image/depth map')
     cmd:option('-numVPs', 20, 'Number of view points for the 3D models')
     cmd:option('-fromScratch', 0, "It indicates whether to use the pre-stored, resized data or do the process of resizing again: 0 | 1")
-    cmd:option('-imgSize', 224, '3D grid size. E.g. 224')
+    cmd:option('-imgSize', 224, '2D images size. E.g. 224')
     -- Model:
     cmd:option('-nCh', 74, "Base number of feature maps for each convolutional layer")
-    cmd:option('-nLatents', 120, 'The number of latent variables in the Z layer')
+    cmd:option('-nLatents', 100, 'The number of latent variables in the Z layer')
     cmd:option('-tanh', 0, "Set to 1 if you want to normalize the input/output values to be between -1 and 1 instead of 0 to 1")
     -- Training:
     cmd:option('-batchSize', 4, 'Batch size for training (SGD): any integer number (1 or higher)')
     cmd:option('-batchSizeChangeEpoch', 15, 'Changes the batch size every X epochs')
     cmd:option('-batchSizeChange', 20, 'The number to be subtracted/added every opt.batchSizeChangeEpoch from opt.batchSize: any integer number (1 or higher)')
     cmd:option('-targetBatchSize', 8, 'Maximum batch size (could be set equal to batchSize)')
-    cmd:option('-nReconstructions', 50, 'An integer indicating how many reconstuctions to be generated from the test data set')
-    cmd:option('-initialLR', 0.0000035, 'The learning rate to be used for the first few epochs of training')
+    cmd:option('-initialLR', 0.000002, 'The learning rate to be used for the first few epochs of training')
     cmd:option('-lr', 0.000085, 'The learning rate: Any positive decimal value')
     cmd:option('-lrDecay', 0.98, 'The rate to aneal the learning rate')
     cmd:option('-maxEpochs', 80, 'The maximum number of epochs')
@@ -53,14 +52,14 @@ if not opt then
     cmd:option('-singleVPNet', 0, 'If set to 1, will perform random permutation on the input vector view point channels')
     cmd:option('-conditional', 0, 'Indicates whether the model is trained conditionally')
     cmd:option('-KLD', 100, 'The coefficient for the gradients of the KLD loss')
-    -- Testing
+    -- Experiments
     cmd:option('-canvasHW', 5, 'Determines the height and width of the canvas on which the samples from the manifold will be shown on')
     cmd:option('-nSamples', 6, 'Number of samples to be drawn from the prior (z), for each category (if conditional) or otherwise in total')
     cmd:option('-manifoldExp', 'randomSampling', 'The experiment to be performed on the manifold : randomSampling, interpolation')
     cmd:option('-sampleCategory', '', "The category name from which one would like to start generating samples. E.g. 'chair, car, airplane'. If empty, the conditional models will generate samples for all categories in the data set. Will be used if opt.manifoldExp == 'data': A valid category name for which there are examples in the train data set")
     cmd:option('-mean', 0, 'The mean on the z vector elements: Any real number')
     cmd:option('-var', 0, 'The variance of the z vector elements. In case manifoldExp = data then it indicates the ratio by which the predicted model variance will be multiplied by: Any positive real number')
-    cmd:option('-range', 3, 'The range on the real line from which to generate samples: Any positive real number')
+    cmd:option('-nReconstructions', 50, 'An integer indicating how many reconstuctions to be generated from the test data set')
     cmd:text()
     opt = cmd:parse(arg or {})
 
@@ -105,7 +104,7 @@ local batch_size = opt.batchSize
 
 
 -- Build the model
-local modelParams = {opt.numVPs, opt.nCh, opt.nLatents, opt.tanh, opt.singleVPNet, opt.conditional, not opt.conditional and 0 or #data.category}
+local modelParams = {opt.numVPs, opt.nCh, opt.nLatents, opt.tanh, opt.singleVPNet, opt.conditional, not opt.conditional and 0 or #data.category, opt.benchmark, opt.dropoutNet}
 
 local input = nn.Identity()()
 local conditionVector = nn.Identity()()
@@ -147,15 +146,17 @@ if pcall(require, 'cudnn') then
     cudnn.fastest = true
     cudnn.convert(gMod, cudnn)
     print '\n'
+else
+    print '==> cudnn not installed'
 end
 
 -- The loss functions
-local cr1, cr2, criterion, oldCriterion, perceptualCriterion, depthCriterion, classLabelCriterion
-cr1 = nn.AbsCriterion()
+local classLabelCriterion
+local cr1 = nn.AbsCriterion()
 cr1.sizeAverage = false
-cr2 = nn.AbsCriterion()
+local cr2 = nn.AbsCriterion()
 cr2.sizeAverage = false
-criterion = nn.ParallelCriterion():add(cr1):add(cr2)
+local criterion = nn.ParallelCriterion():add(cr1):add(cr2)
 criterion = criterion:cuda()
 KLD = nn.KLDCriterion(opt.KLD):cuda()
 if opt.conditional then
@@ -213,7 +214,7 @@ while continueTraining and epoch <= opt.maxEpochs do
     local empiricalMeansLabels = {}
     local empiricalMeans = {}
     local empiricalLog_Vars = {}
-    local sampleZembeddings = {} -- A table with two entries: a tensor containings the sampled means, a tensor
+    local zEmbeddings = {} -- A table with two entries: a tensor containings the sampled means, a tensor
     trainTotalErrorList[epoch] = 0
     trainKLDErrList[epoch] = 0
     trainSilhouetteErrList[epoch] = 0
@@ -271,8 +272,8 @@ while continueTraining and epoch <= opt.maxEpochs do
                 droppedInputs = commonFuncs.dropInputVPs(not opt.silhouetteInput and depthMaps or silhouettes, false, opt.dropoutNet, nil, nil, opt.singleVPNet, nil, targetClassHotVec)
 
                 local tempTensor = opt.conditional and droppedInputs[1] or droppedInputs
-                -- Randomly permute the input views until epoch 10
-                if not opt.singleVPNet and totalBatchesFed % (math.max(80 + epoch * 6, 320)) == 0 then
+                -- Randomly permute the input views
+                if not opt.singleVPNet and totalBatchesFed % (math.min(80 + epoch * 6, 320)) == 0 then -- Numbers are chosen arbitrarily
                     for temp=1, batch_size do
                         tempTensor[temp] = tempTensor[temp]:index(1, torch.randperm(opt.numVPs):long())
                     end
@@ -281,7 +282,8 @@ while continueTraining and epoch <= opt.maxEpochs do
                 -- Inject random noise to the input
                 local tempNoisyInput = tempTensor[tempTensor:gt(0)]
                 if totalBatchesFed % 10 ~= 0 then
-                    tempTensor[tempTensor:gt(0)] = tempNoisyInput:add(torch.rand(tempNoisyInput:size()):div(epoch <= 6 and epoch*9 or epoch <= 20 and 60 or 70):cuda()) -- Add some noise -- The input is not always clean
+                    -- Commenting the next line will have little to no effect on the overall performance
+                    tempTensor[tempTensor:gt(0)] = tempNoisyInput:add(tempNoisyInput.new():resizeAs(tempNoisyInput):rand(tempNoisyInput:size()):div(epoch <= 6 and epoch*9 or epoch <= 20 and 60 or 70)) -- Add some noise -- Because the input is not always perfectly clean -- Numbers are chosen arbitrarily
                 end
 
                 reconstruction, mean, log_var, predictedClassScores = unpack(model:forward(droppedInputs))
@@ -303,17 +305,19 @@ while continueTraining and epoch <= opt.maxEpochs do
                     -- The number of examples from the current batch that are correctly classified
                     trainClassAccuracyList[epoch] = trainClassAccuracyList[epoch] + commonFuncs.computeClassificationAccuracy(predictedClassScores, targetClassIndices)
                     dEn_dwClass = classLabelCriterion:backward(predictedClassScores, targetClassIndices)
-                    -- Inject small noise to the classification layer's gradients until epoch 4
-                    if epoch <= 4 then
-                        dEn_dwClass:add(dEn_dwClass.new():resizeAs(dEn_dwClass):normal(0, 0.002))
+                    -- Inject small noise to the classification layer's gradients until epoch 5
+                    if epoch <= 5 then
+                        -- Commenting the next line will have little to no effect on the overall performance
+                        dEn_dwClass:add(dEn_dwClass.new():resizeAs(dEn_dwClass):normal(0, 0.003))
                     end
                     trainClassErrList[epoch] = trainClassErrList[epoch] + classErr
                 end
 
-                -- Inject small noise to the reconstructions and before computing the gradients until epoch 20 -- Injects a bit more noise while training for AllVPNet and DropoutNet
+                -- Inject small noise to the reconstructions and before computing the gradients until epoch 20 -- Injects a bit more noise while training for AllVPNet and DropoutNet -- The porpuse is only to have noisy gradients
                 if epoch <= 20 and (not opt.singleVPNet and totalBatchesFed % (10 + epoch * 6) == 0 or totalBatchesFed % (20 + epoch * 8) == 0) then
                     local temp1 = reconstruction[1][reconstruction[1]:gt(0)]
                     local temp2 = reconstruction[2][reconstruction[2]:gt(0)]
+                    -- Commenting the next two lines will have little to no effect on the overall performance
                     reconstruction[1][reconstruction[1]:gt(0)] = temp1:add(torch.rand(temp1:size()):div(epoch * 90):cuda())
                     reconstruction[2][reconstruction[2]:gt(0)] = temp2:add(torch.rand(temp2:size()):div(epoch * 100):cuda())
                 end
@@ -340,6 +344,13 @@ while continueTraining and epoch <= opt.maxEpochs do
                 local dKLD_dmu, dKLD_dlog_var, batchTotalError
                 local KLDerr = KLD:forward(mean, log_var)
                 dKLD_dmu, dKLD_dlog_var = unpack(KLD:backward(mean, log_var))
+
+                if epoch <= 5 then
+                    -- Add some noise to the gradients of the KL term for the first 5 epochs
+                    -- Commenting the next two lines will have little effect on the overall performance
+                    dKLD_dmu:add(dKLD_dmu.new():resizeAs(dKLD_dmu):normal(0, 0.003))
+                    dKLD_dlog_var:add(dKLD_dlog_var.new():resizeAs(dKLD_dlog_var):normal(0, 0.003))
+                end
                 
                 local error_grads
                 if opt.conditional then
@@ -399,6 +410,8 @@ while continueTraining and epoch <= opt.maxEpochs do
     gMod:clearState()
     collectgarbage()
 
+
+
     -- Validation
     model:evaluate()
     local validationTotalError = 0
@@ -412,8 +425,6 @@ while continueTraining and epoch <= opt.maxEpochs do
     validClassErrList[epoch] = 0
     validClassAccuracyList[epoch] = 0
     print ("==> Epoch: " .. epoch .. " Validation for '" .. #validationDataFiles .. "' file(s) containing the validation data set samples on the disk")
-
-if epoch >= 52 then
     data = torch.load(validationDataFiles[1])
     for i=2, #validationDataFiles + 1 do
 
@@ -500,7 +511,6 @@ if epoch >= 52 then
         end
 
     end -- for i=2, #validationDataFiles + 1
-end 
 
     validationTotalError = validationTotalError/numValidSamples/(opt.imgSize^2*opt.numVPs)
     validationTotalErrorList[epoch] = validationTotalError
@@ -518,14 +528,14 @@ end
     gMod:clearState()
     collectgarbage()
 
-    sampleZembeddings = commonFuncs.combineMeanLogVarTensors(empiricalMeans, empiricalLog_Vars, empiricalMeansLabels)
+    zEmbeddings = commonFuncs.combineMeanLogVarTensors(empiricalMeans, empiricalLog_Vars, empiricalMeansLabels)
     -- Print some statistics for the Zs
-    -- sampleZembeddings[2]:exp() -- For easier interpretability
-    -- print (string.format('==> Mean:mean(1):mean(): %.3f, Mean:var(1):mean(): %.3f, Mean:var(1):std(): %.3f, Mean:var(1):min(): %.3f, mean:var(1):max(): %.3f', sampleZembeddings[1]:mean(1):mean(), sampleZembeddings[1]:var(1):mean(), sampleZembeddings[1]:var(1):std(), sampleZembeddings[1]:var(1):min(), sampleZembeddings[1]:var(1):max()))
-    -- print ( string.format('==> Var:mean(1):mean(): %.3f, Var:var(1):mean(): %.3f, Var:var(1):std(): %.3f, Var:var(1):min(): %.3f, Var:var(1):max(): %.3f', sampleZembeddings[2]:mean(1):mean(), sampleZembeddings[2]:var(1):mean(), sampleZembeddings[2]:var(1):std(), sampleZembeddings[2]:var(1):min(), sampleZembeddings[2]:var(1):max()))
-    -- print ( string.format('==> Means:max(): %.3f, Means:min(): %.2f, percent > 1.5: %.3f, percent < -1.5: %.3f', sampleZembeddings[1]:max(), sampleZembeddings[1]:min(), sampleZembeddings[1][sampleZembeddings[1]:gt(1.5)]:nElement()/sampleZembeddings[1]:nElement(), sampleZembeddings[1][sampleZembeddings[1]:lt(-1.5)]:nElement()/sampleZembeddings[1]:nElement()))
-    -- print ( string.format('==> Vars:max(): %.3f, Vars:min(): %.3f, percent > 0.8: %.3f, percent < 0.1: %.3f', sampleZembeddings[2]:max(), sampleZembeddings[2]:min(), sampleZembeddings[2][sampleZembeddings[2]:gt(0.8)]:nElement()/sampleZembeddings[2]:nElement(), sampleZembeddings[2][sampleZembeddings[2]:lt(0.1)]:nElement()/sampleZembeddings[2]:nElement()))
-    -- sampleZembeddings[2]:log()
+    zEmbeddings[2]:exp() -- For easier interpretability
+    print (string.format('==> Mean:mean(1):mean(): %.3f, Mean:var(1):mean(): %.3f, Mean:var(1):std(): %.3f, Mean:var(1):min(): %.3f, mean:var(1):max(): %.3f', zEmbeddings[1]:mean(1):mean(), zEmbeddings[1]:var(1):mean(), zEmbeddings[1]:var(1):std(), zEmbeddings[1]:var(1):min(), zEmbeddings[1]:var(1):max()))
+    print ( string.format('==> Var:mean(1):mean(): %.3f, Var:var(1):mean(): %.3f, Var:var(1):std(): %.3f, Var:var(1):min(): %.3f, Var:var(1):max(): %.3f', zEmbeddings[2]:mean(1):mean(), zEmbeddings[2]:var(1):mean(), zEmbeddings[2]:var(1):std(), zEmbeddings[2]:var(1):min(), zEmbeddings[2]:var(1):max()))
+    print ( string.format('==> Means:max(): %.3f, Means:min(): %.2f, percent > 1.5: %.3f, percent < -1.5: %.3f', zEmbeddings[1]:max(), zEmbeddings[1]:min(), zEmbeddings[1][zEmbeddings[1]:gt(1.5)]:nElement()/zEmbeddings[1]:nElement(), zEmbeddings[1][zEmbeddings[1]:lt(-1.5)]:nElement()/zEmbeddings[1]:nElement()))
+    print ( string.format('==> Vars:max(): %.3f, Vars:min(): %.3f, percent > 0.8: %.3f, percent < 0.1: %.3f', zEmbeddings[2]:max(), zEmbeddings[2]:min(), zEmbeddings[2][zEmbeddings[2]:gt(0.8)]:nElement()/zEmbeddings[2]:nElement(), zEmbeddings[2][zEmbeddings[2]:lt(0.1)]:nElement()/zEmbeddings[2]:nElement()))
+    zEmbeddings[2]:log()
 
 
     -- Save the errors into tensors -- to be used for plotting
@@ -537,20 +547,22 @@ end
         validTotalErrTensor = torch.cat(validTotalErrTensor, torch.Tensor(1,1):fill(validationTotalError/numValidSamples),1)
     end
 
-    if lrDecayDrastic <= 3 and epoch >= (opt.benchmark and 24 or 18) and (epoch % (opt.benchmark and 8 or 6)) == 0 then
+    if lrDecayDrastic <= 3 and epoch >= (opt.benchmark and 30 or 18) and (epoch % (opt.benchmark and 10 or 6)) == 0 then
+        -- Commenting-out this will have tangible effects the overall performance
         lrDecayDrastic = lrDecayDrastic + 1
         print ("==> Learning rate has been SIGNIFICANTLY decreased to " .. config.learningRate * 0.35 .. " from its previous value of " .. config.learningRate)
         config.learningRate = config.learningRate * 0.35
+        KLD = nn.KLDCriterion(opt.KLD):cuda()
     end
 
     
     -- Reconstruct opt.nReconstructions number of test samples, chosen randomly
     N = 1
-    if continueTraining and epoch >= 52 and epoch % 2 == 0 then
+    if continueTraining and epoch >= (opt.benchmark and 90 or 70) and epoch % (opt.benchmark and 3 or 2) == 0 then
         data = torch.load(testDataFiles[1])
         reconBatchSizePerTestFile = math.floor(opt.nReconstructions / #testDataFiles)
         local reconItersPerTestFile = 1
-        if reconBatchSizePerTestFile > 50 then -- Transfer 50 samples to GPU, at most
+        if reconBatchSizePerTestFile > 50 then -- Transfer 50 samples (50 x 20 x 224 x 224) to GPU, at most
             while reconBatchSizePerTestFile > 50 do
                 reconBatchSizePerTestFile = math.floor(reconBatchSizePerTestFile * 0.9)
             end
@@ -669,11 +681,11 @@ end
         trainDataFiles = commonFuncs.randPermTableElements(trainDataFiles)
         data = torch.load(trainDataFiles[1]) -- Load the first training file for the next epoch
         if opt.tanh then data.dataset = commonFuncs.normalizeMinusOneToOne(data.dataset) end
-    end -- END if continueTraining then and epoch >= 10
+    end -- END if continueTraining
 
 
     -- Save the model and parameters
-    if continueTraining and epoch >= 50 or epoch == opt.maxEpochs then
+    if continueTraining and epoch >= 18 and epoch % (opt.benchmark and 3 or 2) == 0 or epoch == opt.maxEpochs then
         local modelPath = string.format('%s/model/epoch%d/', opt.modelDirName, epoch)
         paths.mkdir(modelPath)
         state.v = state.v:float()
@@ -686,19 +698,19 @@ end
             gMod = cudnn.convert(gMod, nn)
         end
         torch.save(modelPath .. 'model.t7', gMod:clone():float())
-        torch.save(modelPath .. 'state.t7', parameters:clone():float())
-        torch.save(modelPath .. 'parameters.t7', state)
+        -- torch.save(modelPath .. 'parameters.t7', parameters:clone():float())
+        -- torch.save(modelPath .. 'state.t7', state)
         if cudnn then
             gMod = cudnn.convert(gMod, cudnn)
             print '\n'
         end
-        if sampleZembeddings then
-            for l=1, #sampleZembeddings do
-                sampleZembeddings[l] = sampleZembeddings[l]:float()
+        if zEmbeddings then
+            for l=1, #zEmbeddings do
+                zEmbeddings[l] = zEmbeddings[l]:float()
             end
-            torch.save(modelPath .. 'mean_logvar.t7', sampleZembeddings)
-            for l=1, #sampleZembeddings do
-                sampleZembeddings[l] = sampleZembeddings[l]:cuda()
+            torch.save(modelPath .. 'mean_logvar.t7', zEmbeddings)
+            for l=1, #zEmbeddings do
+                zEmbeddings[l] = zEmbeddings[l]:cuda()
             end
         end
 
@@ -709,9 +721,9 @@ end
     end
 
     -- Sample/[do interpolation on] the learned manifold
-    if continueTraining and epoch >= (opt.benchmark and 72 or 52) and epoch % (opt.benchmark and 3 or 2) == 0 then
-        local samplesPath = string.format(paths.cwd() .. '/%s/results/epoch%d/manifold',opt.modelDirName, opt.nLatents, opt.batchSize, opt.nCh, opt.lr, epoch)
-        sampleManifold.sample(opt.manifoldExp, opt.sampleCategory, opt.canvasHW, opt.nSamples, data, model, samplesPath, opt.mean, opt.var, opt.nLatents, opt.imgSize, opt.numVPs, epoch, opt.batchSize, opt.targetBatchSize, opt.testPhase, opt.tanh, opt.dropoutNet, opt.VpToKeep, opt.silhouetteInput, sampleZembeddings, opt.singleVPNet, opt.conditional, nil, opt.benchmark)
+    if continueTraining and epoch >= (opt.benchmark and 99 or 76) and epoch % (opt.benchmark and 3 or 2) == 0 then
+        local samplesPath = string.format(paths.cwd() .. '/%s/results/epoch%d/manifold', opt.modelDirName, epoch)
+        sampleManifold.sample(opt.manifoldExp, opt.sampleCategory, opt.canvasHW, opt.nSamples, data, model, samplesPath, opt.mean, opt.var, opt.nLatents, opt.imgSize, opt.numVPs, epoch, opt.batchSize, opt.targetBatchSize, opt.testPhase, opt.tanh, opt.dropoutNet, opt.VpToKeep, opt.silhouetteInput, zEmbeddings, opt.singleVPNet, opt.conditional, nil, opt.benchmark)
     end
 
 
@@ -737,7 +749,7 @@ end
     torch.save(trainErSilPath, torch.FloatTensor(trainSilhouetteErrList))
     torch.save(validErSilPath, torch.FloatTensor(validSilErrList))
     
-    local ErrorPlotNames = {'ErrorTotal - L1Depth-L1Sil', 'ErrorKLD - L1Depth-L1Sil', 'ErrorDepthMap - L1Depth-L1Sil', 'ErrorMask - L1Depth-L1Sil'}
+    local ErrorPlotNames = {'ErrorTotal - L1Depth-L1Sil', 'ErrorKLD - L1Depth-L1Sil', 'ErrorDepthMap - L1Depth-L1Sil', 'ErrorSil - L1Depth-L1Sil'}
     local trainErrPaths = {trainErPath, trainErKLDPath, trainErDepthMapPath, trainErSilPath}
     local validErrPaths = {validErPath, validErKLDPath, validErDepthMapPath, validErSilPath}
 
@@ -747,26 +759,31 @@ end
     commonFuncs.plotError(trainErrPaths, validErrPaths, ErrorPlotNames, plotYAxis, plotTitle, errorPath)
 
     -- Learning rate for the first couple of epochs
-    if epoch <= (opt.benchmark and 14 or 10) then
+    if epoch <= (opt.benchmark and 16 or 10) then
         config.learningRate = torch.linspace(opt.initialLR, opt.lr, opt.benchmark and 38 or 26)[(epoch + 1) * 2]
-    elseif epoch == (opt.benchmark and 15 or 11) then
+    elseif epoch == (opt.benchmark and 17 or 11) then
         config.learningRate = opt.lr
         commonFuncs.clearOptimState(state, true)
     end
 
+
     -- Learning rate change
-    if epoch >= (opt.benchmark and 18 or 12) and epoch < (opt.benchmark and 50 or 37) and opt.lrDecay ~= 1 then 
+    if epoch >= (opt.benchmark and 22 or 12) and epoch < (opt.benchmark and 60 or 37) and opt.lrDecay ~= 1 then 
+        -- Commenting-out this will slightly impact the final results
         print ('==> LR decay: The learning rate has been changed to ' .. config.learningRate * opt.lrDecay .. ' from its previous value of ' .. config.learningRate)
         config.learningRate = config.learningRate * opt.lrDecay
-    elseif epoch == (opt.benchmark and 50 or 37) then
+    elseif epoch == (opt.benchmark and 60 or 37) then
+        -- Commenting-out this will not impact the final results
         print ('==> The learning rate has been increased to ' .. config.learningRate * 1.5 .. ' from its previous value of ' .. config.learningRate)
         config.learningRate = config.learningRate * 1.5
-    elseif epoch > (opt.benchmark and 50 or 37) and epoch <= (opt.benchmark and 80 or 55) then
+    elseif epoch > (opt.benchmark and 60 or 37) and epoch <= (opt.benchmark and 80 or 50) then
+        -- Commenting-out this will not impact the final results
         print ('==> LR decay: The learning rate has been changed to ' .. config.learningRate * math.max(opt.lrDecay - 0.01, 0.94) .. ' from its previous value of ' .. config.learningRate)
         config.learningRate = config.learningRate * math.max(opt.lrDecay - 0.01, 0.94)
-    elseif epoch == (opt.benchmark and 80 or 56) then
-        print ('==> LR decay: The learning rate has been changed to ' .. config.learningRate * 0.5 .. ' from its previous value of ' .. config.learningRate)
-        config.learningRate = config.learningRate * 0.5
+    elseif epoch == (opt.benchmark and 81 or 51) then
+        -- Commenting-out this will not impact the final results
+        print ('==> LR decay: The learning rate has been changed to ' .. config.learningRate * 0.6 .. ' from its previous value of ' .. config.learningRate)
+        config.learningRate = config.learningRate * 0.6
     end
 
     if lrDecayDrastic <= 3 and epoch >= (opt.benchmark and 24 or 18) and (epoch % (opt.benchmark and 8 or 6)) - 1 == 0 then

@@ -375,9 +375,8 @@ function commonFuncs.dropInputVPs(inputTensor, markInputDepthAndMask, dropoutNet
 	if dropoutNet then
 		for i=1, droppedDepthTensor:size(1) do
 			if flag or not dropIndices or dropIndices:sum() == 0 then
-				if not numDropVPs then flag = true numDropVPs = torch.Tensor(1) end
+				if not numDropVPs or (numDropVPs and numDropVPs[1] == 0) then flag = true numDropVPs = torch.Tensor(1) numDropVPs:fill(torch.random(numVPs-5, numVPs-2)) end
 				if not dropIndices then flag = true dropIndices = torch.Tensor(numVPs) end
-				numDropVPs:fill(torch.random(numVPs-5, numVPs-2))
 				dropIndices:copy(torch.randperm(numVPs))
 			end
 			counter = 0

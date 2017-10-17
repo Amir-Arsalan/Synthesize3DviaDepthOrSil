@@ -12,7 +12,7 @@ cmd:text()
 cmd:text('Options:')
 -- Global:
 cmd:option('-globalDataType', 'float', "Sets the default data type for Torch tensors: 'float', 'double'")
-cmd:option('-seed', 1, "The default seed to be used for the random number generator")
+cmd:option('-seed', 0, "The default seed to be used for the random number generator")
 cmd:option('-testPhase', 0, 'Set to 1 when you want to run some small tests just to make sure everything works: 0 | 1')
 cmd:option('-modelDirName', '', 'An string to be used for the name of the directory in which the reconstructions/samples and models will be stored')
 cmd:option('-benchmark', 0, "Set to 1 if you are working with a benchmark data set and you do not want to set any values for pTrain, pValid and pTest")
@@ -24,40 +24,40 @@ cmd:option('-rawDataType', 'int', 'Determines the type of data files to be read:
 cmd:option('-pTrain', 0.925, 'How much, in percentage, of the data will be used for training')
 cmd:option('-pValid', 0.045, 'How much, in percentage, of the data will be used for validation. The validation and test data sets are going to be combined when running experiments')
 cmd:option('-pTest', 0.03, 'How much, in percentage, of the data will be used for testing. The validation and test data sets are going to be combined when running experiments')
+cmd:option('-randPerm', 0, 'Whether the data set must be shuffled before training or not?: 0 | 1')
 cmd:option('-resizeScale', 1, "The resize ratio for the input data: (0, 1]")
 cmd:option('-imgSize', 224, '2D images size. E.g. 224')
 cmd:option('-numVPs', 20, 'Number of rendered view points for the 3D models')
 cmd:option('-train', 1, 'Start training the model')
 -- Model:
 cmd:option('-nCh', 74, "Base number of feature maps for each convolutional layer")
-cmd:option('-nLatents', 140, 'The number of latent variables in the Z layer. The input tensor is n x numVPs x imgSize x imgSize')
+cmd:option('-nLatents', 0, 'The number of latent variables in the Z layer - Default vary for each model (to be set later)')
 cmd:option('-dropoutNet', 0, 'Set to 1 to drop 15 to 18 views during training')
 cmd:option('-silhouetteInput', 0, 'If set to 1, only silhouettes will be used for training/test')
 cmd:option('-singleVPNet', 1, 'Train/test with only 1 randomly-chosen viewpoint. The input tensor is n x 1 x imgSize x imgSize')
-cmd:option('-conditional', 1, 'Set to 1 to train conditional models')
-cmd:option('-KLD', 100, 'The coefficient for the gradients of the KLD loss')
+cmd:option('-conditional', -1, 'Set to 1 to train conditional models')
+cmd:option('-KLD', 0, 'The coefficient for the gradients of the KLD loss')
 -- Training:
 cmd:option('-batchSize', 4, 'Batch size for training')
 cmd:option('-batchSizeChangeEpoch', 20, 'Changes the batch size every X epochs')
 cmd:option('-batchSizeChange', 2, 'The number to be added every opt.batchSizeChangeEpoch to opt.batchSize')
 cmd:option('-targetBatchSize', 8, 'Maximum batch size')
-cmd:option('-nReconstructions', 50, 'An integer indicating how many reconstuctions to be generated from the test data set')
-cmd:option('-initialLR', 0.0000035, 'The learning rate to be used for the first few epochs of training')
+cmd:option('-initialLR', 0.000002, 'The learning rate to be used for the first few epochs of training')
 cmd:option('-lr', 0.000085, 'The learning rate')
 cmd:option('-lrDecay', 0.98, 'The rate to aneal the learning rate')
 cmd:option('-maxEpochs', 80, 'The maximum number of epochs')
 cmd:option('-tanh', 0, "Set to 1 if you want to normalize the input/output values to be between -1 and 1 instead of 0 to 1")
--- Testing:
+-- Experiments
 cmd:option('-canvasHW', 5, 'Determines the height and width of the canvas on which the sample sets will be shown on')
 cmd:option('-nSamples', 2, 'Number of sets of samples to be drawn from the prior/empirical distribution, for each category (if conditional)')
 cmd:option('-manifoldExp', 'randomSampling', 'The experiment to be performed on the manifold : randomSampling, interpolation')
 cmd:option('-mean', 0, 'The mean on the z vector elements: Any real number')
 cmd:option('-var', 1, 'The variance of the z vector elements. In case manifoldExp = data then it indicates the ratio by which the predicted model variance will be multiplied by: Any positive real number')
--- Experiments
+cmd:option('-nReconstructions', 50, 'An integer indicating how many reconstuctions to be generated from the test data set')
 cmd:option('-experiment', 0, "Set to 1 to run experiments on a pre-trained model from epoch 'opt.fromEpoch'")
 cmd:option('-expType', 'sample', 'Indicates the type of experiment to be performed')
 cmd:option('-forwardPassType', '', 'Indicates the type of experiment to be performed: userData | nyud | randomReconstruction | reconstructAllSamples')
-cmd:option('-fromEpoch', 80, 'The epoch from which a pre-trained model will be loaded and used for experiments')
+cmd:option('-fromEpoch', 0, 'The epoch from which a pre-trained model will be loaded and used for experiments')
 cmd:option('-sampleCategory', '', "The category names for which conditional generating samples will be generated or interpolation will be done. E.g. 'chair, car, airplane'")
 cmd:option('-extraDataPath', '', "Path to silhouettes or NYUD data set images")
 cmd:option('-allViewsExp', 0, 'Indicates whether the all views experiment is going to be done for SingleVPNet models')
@@ -68,8 +68,10 @@ cmd:option('-getLatentDist', 0, '')
 cmd:text()
 opt = cmd:parse(arg or {})
 
+if opt.conditional == -1 then print "Make sure you set the 'conditional' argument to either 0 or 1" os.exit() end
 if opt.zip == 1 then opt.zip = true elseif opt.zip == 0 then opt.zip = false else print "==> Incorrect value for zip argument. Acceptables: 0 or 1" os.exit() end
 if opt.fromScratch == 1 then opt.fromScratch = true elseif opt.fromScratch == 0 then opt.fromScratch = false else print "==> Incorrect value for 'fromScratch' argument. Acceptables: 0 or 1" os.exit() end
+if opt.randPerm == 1 then opt.randPerm = true elseif opt.randPerm == 0 then	opt.randPerm = false else print "==> Incorrect value for randPerm argument. Acceptables: 0 or 1" os.exit() end
 if opt.testPhase == 1 then opt.testPhase = true print '==> The code is running in test mode. To switch to normal model set testPhase to 0 when inputting the arguments.' elseif opt.testPhase == 0 then opt.testPhase = false else print "==> Incorrect value for 'testPhase' argument" os.exit() end
 if opt.benchmark == 1 then opt.benchmark = true elseif opt.benchmark == 0 then opt.benchmark = false else print "==> Incorrect value for 'benchmark' argument" os.exit() end
 if opt.tanh == 1 then opt.tanh = true elseif opt.tanh == 0 then opt.tanh = false else print "==> Incorrect value for 'tanh' argument" os.exit() end
@@ -82,8 +84,16 @@ if opt.experiment == 1 then opt.experiment = true if not opt.dropVPs then opt.Vp
 if opt.allViewsExp == 1 then opt.allViewsExp = true elseif opt.allViewsExp == 0 then opt.allViewsExp = false else print "==> Incorrect value for 'allViewsExp' argument" os.exit() end
 if opt.train == 1 then opt.train = true elseif opt.train == 0 then opt.train = false else print "==> Incorrect value for 'train' argument" os.exit() end
 
+opt.nLatents = opt.nLatents == 0 and (opt.conditional and 40 or 100) or opt.nLatents
 if opt.benchmark then
-	opt.KLD = 80 -- Use lower KLD gradient coefficient for ModelNet40
+	-- For ModelNet40
+	opt.nCh = 70
+	opt.maxEpochs = 105
+	opt.lr = 0.000092
+	opt.KLD = opt.KLD == 0 and (not opt.dropoutNet and not opt.singleVPNet and 200 or opt.dropoutNet and not opt.singleVPNet and 150 or 120) or opt.KLD
+else
+	opt.nCh = 74 -- Replace 74 with 70 when trying with MVCNN encoder architecture
+	opt.KLD = opt.KLD == 0 and (not opt.dropoutNet and not opt.singleVPNet and 240 or opt.dropoutNet and not opt.singleVPNet and 180 or 150) or opt.KLD
 end
 
 if opt.sampleCategory ~= '' then
@@ -104,7 +114,7 @@ else print ("You are not allowed to use Torch data type other than 'float' or 'd
 if opt.resizeScale <= 0 or opt.resizeScale > 1 then	opt.resizeScale = 1 end
 if not opt.lr or opt.lr <= 0 then opt.lr = 0.0002 end
 local tempRandInt = torch.random(1, 100000)
-if opt.seed > 0 then torch.manualSeed(opt.seed) end
+if opt.seed > 0 then torch.manualSeed(opt.seed) end -- opt.seed is set to 1 by default
 if opt.modelDirName == '' then opt.modelDirName = string.format('exp%.4f', tostring(torch.rand(1):totable()[1])) end
 if opt.experiment then torch.manualSeed(tempRandInt) end
 

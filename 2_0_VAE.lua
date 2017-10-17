@@ -167,6 +167,83 @@ local function residualBlock(block, nInputPlane, nOutputPlane, count, stride, Ty
   return s
 end
 
+local function temp(mod, singleVPNet, nInputCh, nOutputCh)
+    if not singleVPNet then
+
+        -- local tempModParallel = nn.ParallelTable()
+        -- for i=1, nInputCh do
+        --     local tempMod = nn.Sequential()
+        --     tempMod:add(nn.SpatialDilatedConvolution(1, nOutputCh * 4 / nInputCh, 4, 4, 2, 2, 1, 1, 2, 2))
+        --     tempModParallel:add(tempMod)
+        -- end
+
+        -- local tempMod = nn.Sequential()
+        -- :add(nn.SplitTable(1))
+        --     :add(nn.MapTable()
+        --         :add(nn.Sequential()
+        --             :add(nn.SplitTable(1))
+        --             :add(nn.MapTable()
+        --                 :add(nn.View(1, 224, 224)))))
+        --     :add(nn.MapTable()
+        --             :add(nn.Sequential()
+        --                 :add(tempModParallel)
+        --                 :add(nn.JoinTable(1))
+        --                 :add(nn.View(1, 280, 110, 110))))
+        --     :add(nn.JoinTable(1))
+        --     :add(nn.Sequential():add(nn.SpatialBatchNormalization(nOutputCh * 4)):add(nn.ReLU(true)))
+
+
+        local tempModParallel = nn.ParallelTable()
+        local tempMod = nn.Sequential()
+        for i=1, 1 do
+            -- local tempMod = nn.Sequential()
+            tempMod:add(nn.Contiguous())
+            tempMod:add(nn.View(-1, 1, 224, 224))
+            tempMod:add(nn.SpatialDilatedConvolution(1, nOutputCh * 10 / nInputCh, 4, 4, 2, 2, 1, 1, 2, 2))
+            tempMod:add(nn.SpatialBatchNormalization(nOutputCh * 10 / nInputCh)):add(nn.ReLU(true))
+
+            -- Dilated Convolution
+            tempMod:add(residualBlock(basicblock, nOutputCh * 10 / nInputCh, nOutputCh * 16 / nInputCh, 1, 2, 'first'))
+            -- Output feature map size: 53 x 53
+            tempMod:add(residualBlock(basicblock, nOutputCh * 16 / nInputCh , nOutputCh * 18 / nInputCh, 1, 2))
+            -- Output feature map size: 25 x 25
+            tempMod:add(residualBlock(basicblock, nOutputCh * 18 / nInputCh, nOutputCh * 10 / nInputCh, 1, 2))
+            -- Output feature map size: 11 x 11
+            tempMod:add(residualBlock(basicblock, nOutputCh * 10 / nInputCh, 4, 1, 2))
+            -- tempMod:add(ShareGradInput(SpatialBatchNormalization(4), 'last'))
+            -- Output feature map size: 4 x 4
+            -- tempModParallel:add(tempMod)
+        end
+
+        local tempMod = nn.Sequential()
+        :add(nn.SplitTable(2))
+        -- :add(tempModParallel)
+        :add(nn.MapTable():add(tempMod))
+        :add(nn.JoinTable(2))
+        :add(nn.SpatialBatchNormalization(80))
+        :add(nn.ReLU(true))
+
+            -- :add(nn.MapTable()
+            --     :add(nn.Sequential()
+            --         :add(nn.SplitTable(1))
+            --         :add(nn.MapTable()
+            --             :add(nn.View(1, 224, 224)))))
+            -- :add(nn.MapTable()
+            --         :add(nn.Sequential()
+            --             :add(tempModParallel)
+            --             :add(nn.JoinTable(1))
+            --             :add(nn.View(1, 280, 110, 110))))
+            -- :add(nn.JoinTable(1))
+            -- :add(nn.Sequential():add(nn.SpatialBatchNormalization(nOutputCh * 4)):add(nn.ReLU(true)))
+        
+        mod:add(tempMod)
+    else
+        mod:add(SpatialDilatedConvolution(1, nOutputCh * 4, 4, 4, 2, 2, 1, 1, 2, 2))
+        mod:add(SpatialBatchNormalization(nOutputCh * 4)):add(nn.ReLU(true))
+    end
+    return mod
+end
+
 function VAE.get_encoder(modelParams)
 
     local nInputCh = modelParams[1] -- or number of view points
@@ -175,14 +252,16 @@ function VAE.get_encoder(modelParams)
     local singleVPNet = modelParams[5]
     local conditional = modelParams[6]
     local numCats = modelParams[7]
+    local benchmark = modelParams[8]
+    local dropoutNet = modelParams[9]
 
     local encoder = nn.Sequential()
     encoder:add(SpatialDilatedConvolution(not singleVPNet and nInputCh or 1, nOutputCh * 4, 4, 4, 2, 2, 1, 1, 2, 2))
     encoder:add(SpatialBatchNormalization(nOutputCh * 4)):add(nn.ReLU(true))
-
+    encoder:forward(torch.zeros(4, 20, 224, 224))
+    -- Output feature map size: 110 x 110
 
     -- Dilated Convolution
-    -- Output feature map size: 110 x 110
     encoder:add(residualBlock(basicblock, nOutputCh * 4, nOutputCh * 6, 1, 2, 'first'))
     -- Output feature map size: 53 x 53
     encoder:add(residualBlock(basicblock, nOutputCh * 6, nOutputCh * 8, 1, 2))
@@ -196,14 +275,39 @@ function VAE.get_encoder(modelParams)
 
     encoder:add(nn.View(nOutputCh * 4 * 4))
     local mean_logvar = nn.ConcatTable()
-    mean_logvar:add(nn.Linear(nOutputCh * 4 * 4, nLatents)) -- The means
-    mean_logvar:add(nn.Linear(nOutputCh * 4 * 4, nLatents)) -- Log of the variances
+    if not benchmark or singleVPNet or dropoutNet then
+        mean_logvar:add(nn.Sequential():add(nn.Linear(nOutputCh * 4 * 4, nOutputCh * 4 * 2)):add(nn.ReLU(true)):add(nn.Linear(nOutputCh * 4 * 2, nLatents))) -- The means
+        mean_logvar:add(nn.Sequential():add(nn.Linear(nOutputCh * 4 * 4, nOutputCh * 4 * 2)):add(nn.ReLU(true)):add(nn.Linear(nOutputCh * 4 * 2, nLatents))) -- Log of the variances
+    else
+        mean_logvar:add(nn.Linear(nOutputCh * 4 * 4, nLatents)) -- The means
+        mean_logvar:add(nn.Linear(nOutputCh * 4 * 4, nLatents)) -- Log of the variances
+    end
     if conditional then
         mean_logvar:add(nn.Sequential()
         :add(nn.Linear(nOutputCh * 4 * 4, (nOutputCh * 4 * 4) - 50))
         :add(nn.ReLU(true))
         :add(nn.Linear((nOutputCh * 4 * 4) - 50, numCats)))
     end
+
+
+    -- Trying out MVCNN architecture
+    -- local encoder = nn.Sequential()
+    -- encoder = temp(encoder, singleVPNet, nInputCh, nOutputCh)
+    -- encoder:add(nn.View(80 * 4 * 4))
+    -- local mean_logvar = nn.ConcatTable()
+    -- if not benchmark or singleVPNet or dropoutNet then
+    --     mean_logvar:add(nn.Sequential():add(nn.Linear(80 * 4 * 4, 80 * 4 * 2)):add(nn.ReLU(true)):add(nn.Linear(80 * 4 * 2, nLatents))) -- The means
+    --     mean_logvar:add(nn.Sequential():add(nn.Linear(80 * 4 * 4, 80 * 4 * 2)):add(nn.ReLU(true)):add(nn.Linear(80 * 4 * 2, nLatents))) -- Log of the variances
+    -- else
+    --     mean_logvar:add(nn.Linear(80 * 4 * 4, nLatents)) -- The means
+    --     mean_logvar:add(nn.Linear(80 * 4 * 4, nLatents)) -- Log of the variances
+    -- end
+    -- if conditional then
+    --     mean_logvar:add(nn.Sequential()
+    --     :add(nn.Linear(80 * 4 * 4, (80 * 4 * 4) - 50))
+    --     :add(nn.ReLU(true))
+    --     :add(nn.Linear((80 * 4 * 4) - 50, numCats)))
+    -- end
     encoder:add(mean_logvar)
 
     encoder:apply(weights_init)
@@ -218,8 +322,11 @@ function VAE.get_decoder(modelParams)
     local nOutputCh = modelParams[2]
     local nLatents = modelParams[3]
     local tanh = modelParams[4]
+    local singleVPNet = modelParams[5]
     local conditional = modelParams[6]
     local numCats = modelParams[7]
+    local benchmark = modelParams[8]
+    local dropoutNet = modelParams[9]
 
 
     local decoder = nn.Sequential()
@@ -227,7 +334,12 @@ function VAE.get_decoder(modelParams)
         decoder:add(nn.JoinTable(2))
     end
     
-    decoder:add(nn.Linear(nLatents+numCats, nOutputCh * 2 * 4 * 4))
+    if not benchmark or singleVPNet or dropoutNet then
+        decoder:add(nn.Linear(nLatents+numCats, nOutputCh * 4 * 4)):add(nn.ReLU(true))
+        decoder:add(nn.Linear(nOutputCh * 4 * 4, nOutputCh * 2 * 4 * 4))
+    else
+        decoder:add(nn.Linear(nLatents+numCats, nOutputCh * 2 * 4 * 4))
+    end
     decoder:add(nn.View(nOutputCh * 2 , 4, 4))
     decoder:add(SpatialBatchNormalization(nOutputCh * 2)):add(nn.ReLU(true))
     -- Output feature map size: 4 x 4

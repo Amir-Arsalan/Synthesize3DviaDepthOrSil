@@ -7,11 +7,14 @@ cmd:text()
 cmd:text('Options:')
 cmd:option('-inputDir', '', "The directory to read the results from. The input directory contains other directories for each category (e.g. airplane, car etc).")
 cmd:option('-outputDir', '', "The directory to output the .ply files")
-cmd:option('-resultType', '', "Available options: reconstruction, sampling, interpolation, NN") -- NN is used for the results obtained after running the nearest neighbor experiment on conditional or unconditional samples
-cmd:option('-res', 224, "Grid size resolution")
-cmd:option('-maskThreshold', 0.5, "The threshold to be used for filtering out the noise using the produced silhouettes")
+cmd:option('-experiment', '', "Available options: reconstruction, sampling, interpolation, NN") -- NN is used for the results obtained after running the nearest neighbor experiment on conditional or unconditional samples
+cmd:option('-onlyOneCat', 0, "Set to 1 if the 3D reconstruction is being done for one sample set. E.g. inputDir is 'randomSamples/airplane/sample1' rather than 'samples/")
+cmd:option('-res', 224, "Resolution")
+cmd:option('-maskThreshold', 0.3, "The threshold to be used for filtering out the noise using the produced silhouettes")
 cmd:text()
 opt = cmd:parse(arg or {})
+
+if opt.onlyOneCat == 1 then opt.onlyOneCat = true elseif opt.onlyOneCat == 0 then opt.onlyOneCat = false else print "==> Incorrect value for 'onlyOneCat' argument" os.exit() end
 
 local function getFileNames(thePath)
 	-- Returns the file names in a directory
@@ -36,8 +39,8 @@ local function splitTxt(inputStr, sep)
 end
 
 
-if opt.resultType ~= 'reconstruction' and opt.resultType ~= 'sampling' and opt.resultType ~= 'interpolation' and opt.resultType ~= 'NN' then
-	print "reconType argument is invalid. Please give either of the options 'reconstruction', 'sampling' or 'interpolation'"
+if opt.experiment ~= 'reconstruction' and opt.experiment ~= 'sampling' and opt.experiment ~= 'interpolation' and opt.experiment ~= 'NN' then
+	print "'experiment' argument value is invalid. Please give either of the options 'reconstruction', 'sampling', 'interpolation' or 'NN'"
 	os.exit()
 end
 
@@ -72,22 +75,22 @@ end
 local dirs = getFileNames(opt.inputDir)
 local totalSamples = 0
 local ticTotal = torch.tic()
-for i=1, #dirs do
-	local catName = splitTxt(dirs[i], '/')
+for i=1, not opt.onlyOneCat and #dirs or 1 do
+	local catName = not opt.onlyOneCat and splitTxt(dirs[i], '/') or splitTxt(opt.inputDir, '/')
 	local catSamples = 0
-	catName = catName[#catName]
+	catName = catName[not opt.onlyOneCat and #catName or #catName - 1]
 	if catName ~= outputDirName then
-		print ("==> Fusing the generated depth maps and silhouettes to obtain final point cloud reconstructions for the category: " .. catName)
-		local subDirs = getFileNames(dirs[i])
+		print ("==> Projecting back the generated depth maps to obtain final point cloud representation for the category: " .. catName)
+		local subDirs = not opt.onlyOneCat and getFileNames(dirs[i]) or opt.inputDir
 		local ticCat = torch.tic()
-		for j=1, opt.resultType == 'NN' and #subDirs or 1 do
+		for j=1, opt.experiment == 'NN' and #subDirs or 1 do
 			catSamples = catSamples + 1
 			totalSamples = totalSamples + 1
-			local subSubDirs = opt.resultType ~= 'NN' and subDirs or getFileNames(subDirs[j])
-			for k=1, #subSubDirs do
-				subSubDirs[k] = splitTxt(subSubDirs[k], '/')
-				subSubDirs[k] = dirs[i] .. '/' .. (opt.resultType == 'NN' and subSubDirs[k][#subSubDirs[k] - 1] .. '/' or '') .. subSubDirs[k][#subSubDirs[k]]
-				local splitDirNames = splitTxt(subSubDirs[k], '/')
+			local subSubDirs = opt.experiment ~= 'NN' and subDirs or (not opt.onlyOneCat and getFileNames(subDirs[j]) or opt.inputDir)
+			for k=1, not opt.onlyOneCat and #subSubDirs or 1 do
+				splitSubSubDirs = splitTxt(not opt.onlyOneCat and subSubDirs[k] or opt.inputDir, '/')
+				splitSubSubDirs = not opt.onlyOneCat and dirs[i] .. '/' .. (opt.experiment == 'NN' and splitSubSubDirs[#splitSubSubDirs - 1] .. '/' or '') .. splitSubSubDirs[#splitSubSubDirs] or opt.inputDir
+				local splitDirNames = splitTxt(not opt.onlyOneCat and opt.experiment ~= 'NN' and splitSubSubDirs[k] or not opt.onlyOneCat and opt.experiment == 'NN' and splitSubSubDirs or opt.inputDir, '/')
 				if string.match(splitDirNames[#splitDirNames], 'nearest') then
 					nearestRecon = true
 					subSubSubDirs = getFileNames(getFileNames(subDirs[j])[1])
@@ -100,9 +103,9 @@ for i=1, #dirs do
 					nearestRecon = false
 				end
 				for l=1, nearestRecon and 2 or 1 do
-					local reconDirName = (opt.resultType == 'NN' and splitDirNames[#splitDirNames - 1] or '') ..  '/' .. splitDirNames[#splitDirNames] .. (l == 2 and '/nearestRecon' or '')
+					local reconDirName = (opt.experiment == 'NN' and splitDirNames[#splitDirNames - 1] or '') ..  '/' .. splitDirNames[#splitDirNames] .. (l == 2 and '/nearestRecon' or '')
 					paths.mkdir(opt.outputDir .. '/' .. catName .. '/' .. reconDirName)
-					os.execute("./depthReconstruction -input '" .. (l == 1 and subSubDirs[k] or nearestReconDir) .. "' -output '" .. opt.outputDir .. '/' .. catName .. '/' .. reconDirName .. "' -resolution " .. opt.res .. " -" .. (opt.resultType ~= 'NN' and opt.resultType or 'reconstruction') .. " -mask " .. opt.maskThreshold .. " >/dev/null 2>&1")
+					os.execute("./depthReconstruction -input '" .. (l == 1 and splitSubSubDirs or nearestReconDir) .. "' -output '" .. opt.outputDir .. '/' .. catName .. '/' .. reconDirName .. "' -resolution " .. opt.res .. " -" .. (opt.experiment ~= 'NN' and opt.experiment or 'reconstruction') .. " -mask " .. opt.maskThreshold .. " >/dev/null 2>&1")
 				end
 			end
 		end

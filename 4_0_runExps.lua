@@ -6,7 +6,6 @@ require '2_2_Sampler'
 require 'cutorch'
 require 'cunn'
 require 'nngraph'
-require '2_2_Sampler'
 require 'gnuplot'
 local commonFuncs = require '0_commonFuncs'
 local sampleManifold = require '3_sampleManifold'
@@ -43,7 +42,7 @@ print ''
 if opt.expType == 'randomSampling' then
 	print ("==> Configurations, modelDirName: " .. opt.modelDirName .. ", No. Latents: " .. opt.nLatents .. ", Batch Size: " .. opt.batchSize .. ", Batch Size (BS) Change Epoch: " .. opt.batchSizeChangeEpoch .. ", BS Change: " .. opt.batchSizeChange .. ", Target BS: " .. opt.targetBatchSize .. ", Output Fea. Maps: " .. opt.nCh .. ", LR Decay: " .. opt.lrDecay .. ", Learning Rate: " .. opt.lr .. ", InitialLR: " .. opt.initialLR .. ", KLD Grad. Coeff:" .. opt.KLD .. ", Tanh: " .. (opt.tanh and "True" or "False") .. ', DropoutNet: ' .. (opt.dropoutNet and "True" or "False") .. ', KeepVP: ' .. opt.VpToKeep .. ', silhouetteInput: ' .. (opt.silhouetteInput and "True" or "False") .. ', singleVPNet: ' .. (opt.singleVPNet and "True" or "False") .. ', conditional: ' .. (opt.conditional and "True" or "False") .. ', From Epoch: ' .. opt.fromEpoch)
 	print ('==> Generating ' .. (opt.conditional and 'conditional' or '') .. ' random samples')
-	print ("==> The results will be stored at '" .. experimentResultOutputPath .. (opt.conditional and 'conditionalSamples' or 'randomSamples') .. "'")
+	print ("==> The results will be stored at '" .. experimentResultOutputPath .. (opt.conditional and 'conditionalSamples' or 'randomSamples') .. (meanLogVarPath and '-empirical' or string.format('-Mean_%.2f-Var_%.2f', opt.mean, opt.var)) .. "'")
 	if opt.conditional then
 		if opt.benchmark then
 			data = torch.load(validationDataFiles[torch.random(1, #validationDataFiles)])
@@ -90,6 +89,7 @@ elseif opt.expType == 'forwardPass' then
 			print ('==> Please first copy your images (single view depth maps or silhouettes placed, roughly, in the middle an image of size 224 x 224) to ExtraData/userData')
 			os.exit()
 		end
+		local data = torch.load(testDataFiles[1])
 		print ("==> Doing reconstruction for the silhouettes/depth maps  of user's choice")
 		experimentResultOutputPath = experimentResultOutputPath .. 'userData'
 		print ("==> The results will be stored at '" .. experimentResultOutputPath .. "'")
@@ -105,14 +105,16 @@ elseif opt.expType == 'forwardPass' then
 				local mean, log_var, predictedClassScores = unpack(model:get(2):forward(tempTensor))
                 local predClassVec = commonFuncs.computeClassificationAccuracy(predictedClassScores, nil, true, predictedClassScores:size(2))
                 recon = model:get(4+(opt.conditional and 1 or 0)):forward({nn.Sampler():cuda():forward({mean, log_var}), predClassVec})
+                _, temp = predClassVec:max(2)
 			else
 				recon = unpack(model:forward(tempTensor))
 			end
-			paths.mkdir(experimentResultOutputPath .. '/model' .. i .. '-userData/mask')
-			image.save(experimentResultOutputPath .. '/model' .. i .. '-userData/x-originalInputImage.png', tempTensor[1][1])
+			local outputPath = experimentResultOutputPath .. '/model' .. i .. (opt.conditional and '-predictedClass-' .. data.category[temp[1][1]] or '-userData')
+			paths.mkdir(outputPath .. '/mask')
+			image.save(outputPath .. '/x-originalInputImage.png', tempTensor[1][1])
 			for k=1, recon[1]:size(2) do
-				image.save(experimentResultOutputPath .. '/model' .. i .. '-userData/file' .. i .. '-img' .. i .. '-' .. k-1 .. '-rec.png', recon[1][1][k])
-				image.save(experimentResultOutputPath .. '/model' .. i .. '-userData/mask/file' .. i .. '-img' .. i .. '-' .. k-1 .. '-rec.png', recon[2][1][k])
+				image.save(outputPath .. '/file' .. i*6-3 .. '-img' .. i .. '-' .. k-1 .. '-rec.png', recon[1][1][k])
+				image.save(outputPath .. '/mask/file' .. i*6-3 .. '-img' .. i .. '-' .. k-1 .. '-rec.png', recon[2][1][k])
 			end
 		end
 		print ("==> Finished doing forwardPass for user's images")
@@ -123,56 +125,72 @@ elseif opt.expType == 'forwardPass' then
 		end
 		print('==> Doing forward pass on the NYUD data set')
 		print("==> The results will be stored at '" .. experimentResultOutputPath .. 'nyud' .. "'")
-		experimentResultOutputPath = {experimentResultOutputPath, experimentResultOutputPath}
+		experimentResultOutputPath = {experimentResultOutputPath}
 		experimentResultOutputPath[1] = experimentResultOutputPath[1] .. '/nyud/chair'
-		experimentResultOutputPath[2] = experimentResultOutputPath[2] .. '/nyud/bottle'
-		local dataPaths = {'ExtraData/nyud/chair', 'ExtraData/nyud/bottle'}
-		local dirText = {'chair', 'bottle'}
+		local dataPaths = {'ExtraData/nyud/chair'}
+		local dirText = {'chair'}
+		local data = torch.load(testDataFiles[1])
 		for j=1, #experimentResultOutputPath do
 			local originalDataTensorTable = commonFuncs.loadExtraData(dataPaths[j], opt.forwardPassType, opt.numVPs)
 			if opt.silhouetteInput then
 				local dataTensor = originalDataTensorTable[2]
-				for i=1, originalDataTensorTable[1]:size(1) do
+				-- for i=1, originalDataTensorTable[1]:size(1) do
+					for i=130, 130 do
+					for k=1, 54 do
 					dataTensor = dataTensor:cuda()
 					local inputTensor = torch.cat(dataTensor[{{i}}], dataTensor[{{i}}], 1)
 					if opt.conditional then
 						-- Use the predicted classes to do the reconstruction
 						local mean, log_var, predictedClassScores = unpack(model:get(2):forward(inputTensor))
 		                local predClassVec = commonFuncs.computeClassificationAccuracy(predictedClassScores, nil, true,  predictedClassScores:size(2))
+		                predClassVec:zero()
+		                predClassVec[{{}, {k}}]:fill(1)
 		                recon = model:get(4+(opt.conditional and 1 or 0)):forward({nn.Sampler():cuda():forward({mean, log_var}), predClassVec})
+		                _, temp = predClassVec:max(2)
+		                -- print (data.category[temp[1][1]]) os.exit()
 					else
 						recon = unpack(model:forward(inputTensor))
 					end
-					paths.mkdir(experimentResultOutputPath[j] .. '/model' .. i .. '-' .. dirText[j] .. '/mask')
-					image.save(experimentResultOutputPath[j] .. '/model' .. i .. '-' .. dirText[j] .. '/x-originalSilhouette-Input.png', inputTensor[1][1])
-					image.save(experimentResultOutputPath[j] .. '/model' .. i .. '-' .. dirText[j] .. '/x-originalDepth.png', originalDataTensorTable[1][i][1])
-					image.save(experimentResultOutputPath[j] .. '/model' .. i .. '-' .. dirText[j] .. '/x-originalRGB.png', originalDataTensorTable[3][i])
+					local outputPath = experimentResultOutputPath[j] .. '/model' .. i .. (opt.conditional and '-predictedClass-' .. data.category[temp[1][1]] or '')
+					paths.mkdir(outputPath .. '/mask')
+					image.save(outputPath .. '/x-originalSilhouette-Input.png', inputTensor[1][1])
+					image.save(outputPath .. '/x-originalDepth.png', originalDataTensorTable[1][i][1])
+					image.save(outputPath .. '/x-originalRGB.png', originalDataTensorTable[3][i])
 					for k=1, recon[1]:size(2) do
-						image.save(experimentResultOutputPath[j] .. '/model' .. i .. '-' .. dirText[j] .. '/file' .. i .. '-img' .. i .. '-' .. k-1 .. '-rec.png', recon[1][1][k])
-						image.save(experimentResultOutputPath[j] .. '/model' .. i .. '-' .. dirText[j] .. '/mask/file' .. i .. '-img' .. i .. '-' .. k-1 .. '-rec.png', recon[2][1][k])
+						image.save(outputPath .. '/file' .. i .. '-img' .. i .. '-' .. k-1 .. '-rec.png', recon[1][1][k])
+						image.save(outputPath .. '/mask/file' .. i .. '-img' .. i .. '-' .. k-1 .. '-rec.png', recon[2][1][k])
 					end
+				end
 				end
 			else
 				local depthTensor = originalDataTensorTable[1]
-				for i=1, originalDataTensorTable[1]:size(1) do
+				-- for i=1, originalDataTensorTable[1]:size(1) do
+				for i=130, 130 do
+					for k=1, 54 do
 					depthTensor = depthTensor:cuda()
 					local inputTensor = torch.cat(depthTensor[{{i}}], depthTensor[{{i}}], 1)
 					if opt.conditional then
 						-- Use the predicted classes to do the reconstruction
 						local mean, log_var, predictedClassScores = unpack(model:get(2):forward(inputTensor))
 		                local predClassVec = commonFuncs.computeClassificationAccuracy(predictedClassScores, nil, true,  opt.benchmark and 40 or 54)
+		                predClassVec:zero()
+		                predClassVec[{{}, {k}}]:fill(1)
 		                recon = model:get(4+(opt.conditional and 1 or 0)):forward({nn.Sampler():cuda():forward({mean, log_var}), predClassVec})
+		                _, temp = predClassVec:max(2)
+		                print (data.category[temp[1][1]]) os.exit()
 					else
 						recon = unpack(model:forward(inputTensor))
 					end
-					paths.mkdir(experimentResultOutputPath[j] .. '/model' .. i .. '-' .. dirText[j] .. '/mask')
-					image.save(experimentResultOutputPath[j] .. '/model' .. i .. '-' .. dirText[j] .. '/x-originalDepth-Input.png', inputTensor[1][1])
-					image.save(experimentResultOutputPath[j] .. '/model' .. i .. '-' .. dirText[j] .. '/x-originalSilhouette.png', originalDataTensorTable[2][i][1])
-					image.save(experimentResultOutputPath[j] .. '/model' .. i .. '-' .. dirText[j] .. '/x-originalRGB.png', originalDataTensorTable[3][i])
+					local outputPath = experimentResultOutputPath[j] .. '/model' .. i .. (opt.conditional and '-predictedClass-' .. data.category[temp[1][1]] or '')
+					paths.mkdir(outputPath .. '/mask')
+					image.save(outputPath .. '/x-originalDepth-Input.png', inputTensor[1][1])
+					image.save(outputPath .. '/x-originalSilhouette.png', originalDataTensorTable[2][i][1])
+					image.save(outputPath .. '/x-originalRGB.png', originalDataTensorTable[3][i])
 					for k=1, recon[1]:size(2) do
-						image.save(experimentResultOutputPath[j] .. '/model' .. i .. '-' .. dirText[j] .. '/file' .. i .. '-img' .. i .. '-' .. k-1 .. '-rec.png', recon[1][1][k])
-						image.save(experimentResultOutputPath[j] .. '/model' .. i .. '-' .. dirText[j] .. '/mask/file' .. i .. '-img' .. i .. '-' .. k-1 .. '-rec.png', recon[2][1][k])
+						image.save(outputPath .. '/file' .. i .. '-img' .. i .. '-' .. k-1 .. '-rec.png', recon[1][1][k])
+						image.save(outputPath .. '/mask/file' .. i .. '-img' .. i .. '-' .. k-1 .. '-rec.png', recon[2][1][k])
 					end
+				end
 				end
 			end
 		end
@@ -192,7 +210,7 @@ elseif opt.expType == 'forwardPass' then
 			tempData.dataset = nil
 			tempData = nil
 		else
-			data = torch.load(allData[2])
+			data = torch.load(allData[2][1])
 		end
 
 		local indicesToChoose = torch.randperm(data.dataset:size(1))
@@ -301,7 +319,7 @@ elseif opt.expType == 'forwardPass' then
 			                targetClassIndices = torch.cat(targetClassIndices, targetClassIndices, 1):cuda()
 			            end
 
-			            local numOfVPsToDrop = torch.zeros(1) -- A placeholder to hold the number of view points to be dropped for the current category
+			            local numOfVPsToDrop = torch.zeros(1) -- A placeholder to hold the number of view points to be dropped (use for DropoutNet)
 		                local dropIndices = torch.zeros(opt.numVPs) -- A placeholder to hold the indices of the tensor to be zeroed-out  -- Used for dropoutNet
 		                local pickedVPs = torch.Tensor(2) -- A placeholder to hold the view point to be kept -- Used for singleVPNet
 		                if not opt.allViewsExp and opt.VpToKeep >= numVPs then
@@ -353,7 +371,7 @@ elseif opt.expType == 'forwardPass' then
 	                    originalSil = nil
 						if opt.maxNumOfRecons > 0 and counter <= opt.maxNumOfRecons or opt.maxNumOfRecons == 0 then
 							-- Will reconstruct all of the samples if opt.maxNumOfRecons is set to 0
-							local reconPath = experimentResultOutputPath .. (opt.singleVPNet and opt.allViewsExp and '/view' .. l or '') .. (t == 1 and '/train' or '/test') .. catLabel .. '/model' .. counter .. (opt.dropoutNet and 'VPs' .. (opt.numVPs - numOfVPsToDrop[1]) or opt.singleVPNet and not opt.allViewsExp and 'VP' .. pickedVPs[1] or '') .. '-' .. catLabel
+							local reconPath = experimentResultOutputPath .. (opt.singleVPNet and opt.allViewsExp and '/view' .. l or '') .. (t == 1 and '/train/' or '/test/') .. catLabel .. '/model' .. counter .. (opt.dropoutNet and 'VPs' .. (opt.numVPs - numOfVPsToDrop[1]) or opt.singleVPNet and not opt.allViewsExp and 'VP' .. pickedVPs[1] or '') .. '-' .. catLabel
 							paths.mkdir(reconPath .. '/mask')
 							for k=1, recon[1]:size(2) do
 								image.save(reconPath .. '/file1-img-' .. k-1 .. '-rec.png', recon[1][1][k])
@@ -365,7 +383,7 @@ elseif opt.expType == 'forwardPass' then
 							end
 						end
 						counter = counter + 1
-						if i == 4 then collectgarbage() end
+						if i % 4 == 0 then collectgarbage() end
 					end
 					data = nil
 					collectgarbage()
@@ -411,7 +429,7 @@ elseif opt.expType == 'NNs' then
 
 	print ("==> Doing the nearest neighbors experiment")
 	print ("==> Configurations, modelDirName: " .. opt.modelDirName .. ", No. Latents: " .. opt.nLatents .. ", Batch Size: " .. opt.batchSize .. ", Batch Size (BS) Change Epoch: " .. opt.batchSizeChangeEpoch .. ", BS Change: " .. opt.batchSizeChange .. ", Target BS: " .. opt.targetBatchSize .. ", Output Fea. Maps: " .. opt.nCh .. ", LR Decay: " .. opt.lrDecay .. ", Learning Rate: " .. opt.lr .. ", InitialLR: " .. opt.initialLR .. ", KLD Grad. Coeff:" .. opt.KLD .. ", Tanh: " .. (opt.tanh and "True" or "False") .. ', DropoutNet: ' .. (opt.dropoutNet and "True" or "False") .. ', KeepVP: ' .. opt.VpToKeep .. ', silhouetteInput: ' .. (opt.silhouetteInput and "True" or "False") .. ', singleVPNet: ' .. (opt.singleVPNet and "True" or "False") .. ', conditional: ' .. (opt.conditional and "True" or "False") .. ', From Epoch: ' .. opt.fromEpoch)
-	local samplesPath = experimentResultOutputPath .. (opt.conditional and 'conditionalSamples' or 'randomSamples') -- The path from which the samples will be read
+	local samplesPath = experimentResultOutputPath .. (opt.conditional and 'conditionalSamples' or 'randomSamples').. (meanLogVarPath and '-empirical' or string.format('-Mean_%.2f-Var_%.2f', opt.mean, opt.var)) -- The path from which the samples will be read
 	experimentResultOutputPath = experimentResultOutputPath .. 'nearestNeighbors' .. (opt.conditional and '/conditionalSamples' or '/randomSamples')
 	print ('==> Running nearest neighbors experiment. Please be patient. This experiment might take a long time especially if your training set is large.')
 	print('==> The results will be stored at ' .. "'" .. experimentResultOutputPath .. "'")
@@ -419,18 +437,21 @@ elseif opt.expType == 'NNs' then
 
 	-- Get the Zs for the training data set
 	local counter = 1
+	local stupidCounter = 1
 	local Zs = {}
 	local labels = {}
 	local sampler = nn.Sampler()
-	local dropIndices = torch.zeros(opt.numVPs) -- A placeholder to hold the indices of the tensor to be zeroed-out  -- Used for dropoutNet
+	-- local dropIndices = torch.zeros(opt.numVPs) -- A placeholder to hold the indices of the tensor to be zeroed-out  -- Used for dropoutNet
     local pickedVPs = torch.Tensor(2) -- A placeholder to hold the view point to be kept -- Used for singleVPNet
     if opt.singleVPNet then
-    	-- Fix on view 12
-        pickedVPs[1] = 12
-        pickedVPs[2] = 12
+    	-- Fix on view 14 because view 14 has the highest classification accuracy and low reconstruction errors
+        pickedVPs[1] = 14
+        pickedVPs[2] = 14
     end
 	sampler = sampler:cuda()
 	for i=1, #trainDataFiles do
+		data = nil
+		collectgarbage()
 		data = torch.load(trainDataFiles[i])
 
 		local localZs = torch.zeros(data.dataset:size(1), opt.nLatents*2):cuda()
@@ -447,7 +468,7 @@ elseif opt.expType == 'NNs' then
 	        else
 	            silhouettes[silhouettes:gt(0)] = 1
 	        end
-	        local droppedInputs = commonFuncs.dropInputVPs(not opt.silhouetteInput and depthMaps or silhouettes, false, opt.dropoutNet, nil, dropIndices, opt.singleVPNet, pickedVPs)
+	        local droppedInputs = commonFuncs.dropInputVPs(not opt.silhouetteInput and depthMaps or silhouettes, false, opt.dropoutNet, nil, nil, opt.singleVPNet, pickedVPs)
 			local tempTensor = droppedInputs
 			local tempNoisyInput = tempTensor[tempTensor:gt(0)]
 			tempTensor[tempTensor:gt(0)] = tempNoisyInput:add(torch.rand(tempNoisyInput:size()):div(100):cuda())
@@ -491,10 +512,11 @@ elseif opt.expType == 'NNs' then
 				f:close()
 			end
 		end
+
 		local samplesZs = torch.zeros(depthMapsTensor:size(1), opt.nLatents*2):cuda()
 		local sampleLabels = torch.zeros(depthMapsTensor:size(1))
 		for i=1, depthMapsTensor:size(1) do
-			local droppedInputs = commonFuncs.dropInputVPs({depthMapsTensor[{{i}}], silhouetteSTensor[{{i}}]}, true, opt.dropoutNet, nil, dropIndices, opt.singleVPNet, pickedVPs)
+			local droppedInputs = commonFuncs.dropInputVPs({depthMapsTensor[{{i}}], silhouetteSTensor[{{i}}]}, true, opt.dropoutNet, nil, nil, opt.singleVPNet, pickedVPs)
 			droppedInputs = {droppedInputs[1]:cuda(), droppedInputs[2]:cuda()}
 			local tempTensor = opt.silhouetteInput and droppedInputs[2] or droppedInputs[1]
 			local tempNoisyInput = tempTensor[tempTensor:gt(0)]
@@ -520,7 +542,7 @@ elseif opt.expType == 'NNs' then
 
 			-- Find the closest representation
 			local possibleLabel
-			local minDist = 1000000 -- Set the initial distance
+			local minDist = 1000000
 			local minLabel
 			local L1Norm
 			for j=1, #Zs do
@@ -538,7 +560,7 @@ elseif opt.expType == 'NNs' then
 
 			-- Store the sample's depth maps and silhouettes on disk
 			local localCounter = 0
-			local randomSamplePath = experimentResultOutputPath .. '/' .. (not opt.conditional and catName or groundTruthCatName[i]) .. '/' .. i .. '/sample' .. (opt.conditional and '-PredictedClass-' .. data.category[sampleLabels[i]] or '') .. '/'
+			local randomSamplePath = experimentResultOutputPath .. '/' .. (opt.conditional and catName or groundTruthCatName[i]) .. '/' .. i .. minZFileNo[i] .. '/sample' .. (opt.conditional and '-PredictedClass-' .. data.category[sampleLabels[i]] or '') .. '/'
 			paths.mkdir(randomSamplePath .. 'mask')
 			for k=1, depthMapsTensor:size(2) do
 				image.save(randomSamplePath .. 'file-' .. counter .. localCounter .. '-img-' .. k-1 .. '-rec.png', depthMapsTensor[i][k])
@@ -565,50 +587,64 @@ elseif opt.expType == 'NNs' then
 			reconSil[{{i}}]:copy(recon[2][{{1}}])
 			localCounter = localCounter + 1
 			minLabel = nil
+			stupidCounter = stupidCounter + 1
 		end
 		data = nil
 		collectgarbage()
 
-		local lastFileID = minZFileNo[1]
-		local localCounter = 1
-		data = torch.load(trainDataFiles[minZFileNo[1]])
-		for i=1, #minZFileNo do
-			local nearestPath = experimentResultOutputPath .. '/' .. (not opt.conditional and catName or groundTruthCatName[i]) .. '/' .. i .. '/nearest' .. (opt.conditional and '-' .. groundTruthCatName[i] or '') 
-			paths.mkdir(nearestPath .. '/mask')
-			paths.mkdir(nearestPath .. '/nearestRecon/mask') -- To store the reconstruction of the nearest neighbor
-			if lastFileID ~= minZFileNo[i] then
-				-- This process is very time-consuming and inefficiently implemented especially if there are many training files on disk
-				-- Make it optimized!
-				lastFileID = minZFileNo[i]
-				data = nil
-				collectgarbage()
-				data = torch.load(trainDataFiles[minZFileNo[i]])
-			end
-			local depths = data.dataset[{{minZIndex[i]}}]:clone()
-			local silhouettes = depths:clone()
-			if opt.tanh then
-	            silhouettes[silhouettes:gt(-1)] = 1
-	            silhouettes[silhouettes:eq(-1)] = 0
-	        else
-	        	silhouettes[silhouettes:gt(0)] = 1
-	        end
-	        commonFuncs.dropInputVPs({depths, silhouettes}, true, opt.dropoutNet, nil, dropIndices, opt.singleVPNet, pickedVPs)
-			for k=1, depthMapsTensor:size(2) do
-				image.save(nearestPath .. '/file' .. counter .. localCounter .. '-img-' .. k-1 .. '-or.png', depths[1][k])
-				image.save(nearestPath .. '/mask/file' .. counter ..localCounter .. '-img-' .. k-1 .. '-or.png', silhouettes[1][k])
 
-				-- Store the reconstruction
-				image.save(nearestPath .. '/nearestRecon/file' .. counter .. localCounter .. '-img-' .. k-1 .. '-rec.png', reconDepth[i][k])
-				image.save(nearestPath .. '/nearestRecon/mask/file' .. counter ..localCounter .. '-img-' .. k-1 .. '-rec.png', reconSil[i][k])
+		-- Store the reconstructions on disk
+		local localCounter = 1
+		-- data = torch.load(trainDataFiles[minZFileNo[1]])
+		for j=1, #trainDataFiles do
+			-- lastFileID = j
+			data = nil
+			collectgarbage()
+			data = torch.load(trainDataFiles[j])
+			for i=1, #minZFileNo do
+				if minZFileNo[i] == j then
+					local nearestPath = experimentResultOutputPath .. '/' .. (opt.conditional and catName or groundTruthCatName[i]) .. '/' .. i .. minZFileNo[i] .. '/nearest' .. (opt.conditional and '-' .. groundTruthCatName[i] or '') 
+					paths.mkdir(nearestPath .. '/mask')
+					paths.mkdir(nearestPath .. '/nearestRecon/mask') -- To store the reconstruction of the nearest neighbor
+					-- if lastFileID ~= minZFileNo[i] then
+					-- 	-- This process is very time-consuming and inefficiently implemented especially if there are many training files on disk
+					-- 	-- Make it optimized!
+						-- lastFileID = minZFileNo[i]
+					-- 	data = nil
+					-- 	collectgarbage()
+					-- 	data = torch.load(trainDataFiles[minZFileNo[i]])
+					-- end
+					local depths = data.dataset[{{minZIndex[i]}}]:clone()
+					local silhouettes = depths:clone()
+					if opt.tanh then
+			            silhouettes[silhouettes:gt(-1)] = 1
+			            silhouettes[silhouettes:eq(-1)] = 0
+			        else
+			        	silhouettes[silhouettes:gt(0)] = 1
+			        end
+			        commonFuncs.dropInputVPs({depths, silhouettes}, true, opt.dropoutNet, nil, dropIndices, opt.singleVPNet, pickedVPs)
+					for k=1, depthMapsTensor:size(2) do
+						image.save(nearestPath .. '/file' .. counter .. localCounter .. '-img-' .. k-1 .. '-or.png', depths[1][k])
+						image.save(nearestPath .. '/mask/file' .. counter ..localCounter .. '-img-' .. k-1 .. '-or.png', silhouettes[1][k])
+
+						-- Store the reconstruction
+						image.save(nearestPath .. '/nearestRecon/file' .. counter .. localCounter .. '-img-' .. k-1 .. '-rec.png', reconDepth[i][k])
+						image.save(nearestPath .. '/nearestRecon/mask/file' .. counter ..localCounter .. '-img-' .. k-1 .. '-rec.png', reconSil[i][k])
+					end
+					localCounter = localCounter + 1
+				end
 			end
-			localCounter = localCounter + 1
+			
 		end
 		counter = counter + 1
-		print ("==> Done storing results for " .. (opt.conditional and 'chosen samples from' .. catName .. ' category' or 'random samples'))
+		print ("==> Done storing results for " .. (opt.conditional and 'chosen samples for ' .. catName .. ' category' or 'random samples'))
 	end
 	print '==> Nearest neighbor experiment is done'
 	data = nil
 	collectgarbage()
+
+
+
 elseif opt.expType == 'tSNE' then
 	print ("==> Configurations, modelDirName: " .. opt.modelDirName .. ", No. Latents: " .. opt.nLatents .. ", Batch Size: " .. opt.batchSize .. ", Batch Size (BS) Change Epoch: " .. opt.batchSizeChangeEpoch .. ", BS Change: " .. opt.batchSizeChange .. ", Target BS: " .. opt.targetBatchSize .. ", Output Fea. Maps: " .. opt.nCh .. ", LR Decay: " .. opt.lrDecay .. ", Learning Rate: " .. opt.lr .. ", InitialLR: " .. opt.initialLR .. ", KLD Grad. Coeff:" .. opt.KLD .. ", Tanh: " .. (opt.tanh and "True" or "False") .. ', DropoutNet: ' .. (opt.dropoutNet and "True" or "False") .. ', KeepVP: ' .. opt.VpToKeep .. ', silhouetteInput: ' .. (opt.silhouetteInput and "True" or "False") .. ', singleVPNet: ' .. (opt.singleVPNet and "True" or "False") .. ', conditional: ' .. (opt.conditional and "True" or "False") .. ', From Epoch: ' .. opt.fromEpoch)
 	experimentResultOutputPath = experimentResultOutputPath .. 'tSNE'
@@ -673,7 +709,7 @@ elseif opt.expType == 'tSNE' then
 	end
 	tsne = require 'tsne'
 	allZs = allZs:double()
-	local y = tsne(allZs, 2, 1900, 6500, 0.15, 20)
+	local y = tsne(allZs, 2, opt.testPhase and 400 or 1900, opt.testPhase and 2000 or  6500, 0.15, opt.testPhase and 8 or 24)
 	commonFuncs.show_scatter_plot('tSNE-Plot', y, allLabels, #data.category, data.category, experimentResultOutputPath)
 
 	print '==> Finished running tSNE experiment'
