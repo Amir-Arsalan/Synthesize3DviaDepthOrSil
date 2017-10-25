@@ -41,7 +41,7 @@ Setting both `dropoutNet` and `singleVPNet` to `0` means that you are working wi
 ## Data
 
 ### Using the pre-rendered data
-You can download the pre-rendered data sets for both [ShapNet Core](https://www.shapenet.org/) and [ModelNet40](http://3dshapenets.cs.princeton.edu/) from [here](https://www.amazon.com/clouddrive/share/XRQcedcwFPQlAjaIBKt3UskksFDyIi9iEC6tjS9ICBk). You will need about ~30GBs and ~8GBs for the .zip files for `ShapeNet Core` and `ModelNet40` data sets respectively. The data sets only contain raw depth map rendering results in float or int (stored in png files). To process the data sets and store the viewpoint depth maps into `Torch` tensors you  would need an additional ~160GBs and ~55GBs for each `ShapeNet Core` or `ModelNet40` respectively. Set the `benchmark` argument to 0 or 1 to use the ShapeNet core or ModelNet40 data sets respectively.
+You can download the pre-rendered data sets for [ShapNet Core](https://www.shapenet.org/) from [here](https://www.amazon.com/clouddrive/share/oDnklSMldXWd3CrzSu5ndfl0GMIBffRfvMAFvkWkz5x). You will need about ~30GBs and ~8GBs for the .zip files for `ShapeNet Core` and `ModelNet40` data sets respectively. The data sets only contain raw depth map rendering results in float or int (stored in png files). To process the data sets and store the viewpoint depth maps into `Torch` tensors you  would need an additional ~160GBs and ~55GBs for each `ShapeNet Core` or `ModelNet40` respectively. Set the `benchmark` argument to 0 or 1 to use the ShapeNet core or ModelNet40 data sets respectively.
 
     Run the following command to store the rendered 2D images of depth maps into Torch tensors:
     th main.lua -zip 1 -fromScratch 1 -maxMemory 3000 -train 0
