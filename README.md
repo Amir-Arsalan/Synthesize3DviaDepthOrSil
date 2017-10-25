@@ -60,25 +60,25 @@ If you want to create your own data set you can use the rendering code provided 
 Here are a few examples on how to train different models. The models will be trained on the ShapeNet core data set unless you set `benchmark` to `1`:
 
     Train an unconditional `AllVPNet` model using depth maps:
-    th main.lua  -modelDirName "AllVPNet" -dropoutNet 0 -singleVPNet 0 -silhouetteInput 0 -conditional 0 -benchmark 0 -experiment 1
+    th main.lua  -modelDirName "AllVPNet" -dropoutNet 0 -singleVPNet 0 -silhouetteInput 0 -conditional 0 -benchmark 0
     
     Train a conditional `DropoutNet` model using depth maps:
-    th main.lua  -modelDirName "DropoutNet-Conditional" -dropoutNet 1 -singleVPNet 0 -silhouetteInput 0 -conditional 1 -benchmark 0 -experiment 1
+    th main.lua  -modelDirName "DropoutNet-Conditional" -dropoutNet 1 -singleVPNet 0 -silhouetteInput 0 -conditional 1 -benchmark 0
     
     Train a conditional `SingleVPNet` using silhouettes:
-    th main.lua  -modelDirName "SingleVPNet-Cond" -dropoutNet 0 -singleVPNet 1 -silhouetteInput 1 -conditional 1 -benchmark 0 -experiment 1
+    th main.lua  -modelDirName "SingleVPNet-Cond" -dropoutNet 0 -singleVPNet 1 -silhouetteInput 1 -conditional 1 -benchmark 0
     
     Train an unconditional `AllVPNet` model for `ModelNet40` data set with silhouettes:
-    th main.lua  -modelDirName "AllVPNet" -dropoutNet 0 -singleVPNet 0 -silhouetteInput 0 -conditional 0 -benchmark 1 -experiment 1
+    th main.lua  -modelDirName "AllVPNet" -dropoutNet 0 -singleVPNet 0 -silhouetteInput 0 -conditional 0 -benchmark 1
 
 ## Testing:
     To load a model and use it for testing (reconstruction, sampling etc) do the followings:
     Make sure you have stored the depth maps into tensors (`th main.lua -zip 1 -fromScratch 1 -maxMemory 3000 -train 0`)
-    Download a pre-trained model and its corresponding `mean_logvar.t7` file from [here](https://www.amazon.com/clouddrive/share/ar4GuXPAPtUBb4NRbjjbrzNB3BLL2On5nD4jYhFbdTi?ref_=cd_ph_share_link_copy)
+    Download a pre-trained model and its corresponding `mean_logvar.t7` file from [here](https://www.amazon.com/clouddrive/share/oDnklSMldXWd3CrzSu5ndfl0GMIBffRfvMAFvkWkz5x)
     Set the optional arguments in accordance to the model downloaded
-    Copy `model.t7` and `mean_logvar.t7` to `modelDirName/model`
+    Copy `model.t7` and `mean_logvar.t7` to `modelDirName/model/[epochx]`
 
-Set `opt.testPhase` to `1` for quick runs/tests Make sure you set `testPhase` to `0` when training or running experiments.
+Set `testPhase` to `1` for quick runs/tests Make sure you set `testPhase` to `0` when training or running experiments. Set `fromEpoch` to `80` if you are using the pre-trained models.
     
 ## Visualization in 3D (Point Cloud)
     To generate the final 3D shape do the followings:
