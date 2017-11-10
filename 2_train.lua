@@ -529,13 +529,6 @@ while continueTraining and epoch <= opt.maxEpochs do
     collectgarbage()
 
     zEmbeddings = commonFuncs.combineMeanLogVarTensors(empiricalMeans, empiricalLog_Vars, empiricalMeansLabels)
-    -- Print some statistics for the Zs
-    zEmbeddings[2]:exp() -- For easier interpretability
-    print (string.format('==> Mean:mean(1):mean(): %.3f, Mean:var(1):mean(): %.3f, Mean:var(1):std(): %.3f, Mean:var(1):min(): %.3f, mean:var(1):max(): %.3f', zEmbeddings[1]:mean(1):mean(), zEmbeddings[1]:var(1):mean(), zEmbeddings[1]:var(1):std(), zEmbeddings[1]:var(1):min(), zEmbeddings[1]:var(1):max()))
-    print ( string.format('==> Var:mean(1):mean(): %.3f, Var:var(1):mean(): %.3f, Var:var(1):std(): %.3f, Var:var(1):min(): %.3f, Var:var(1):max(): %.3f', zEmbeddings[2]:mean(1):mean(), zEmbeddings[2]:var(1):mean(), zEmbeddings[2]:var(1):std(), zEmbeddings[2]:var(1):min(), zEmbeddings[2]:var(1):max()))
-    print ( string.format('==> Means:max(): %.3f, Means:min(): %.2f, percent > 1.5: %.3f, percent < -1.5: %.3f', zEmbeddings[1]:max(), zEmbeddings[1]:min(), zEmbeddings[1][zEmbeddings[1]:gt(1.5)]:nElement()/zEmbeddings[1]:nElement(), zEmbeddings[1][zEmbeddings[1]:lt(-1.5)]:nElement()/zEmbeddings[1]:nElement()))
-    print ( string.format('==> Vars:max(): %.3f, Vars:min(): %.3f, percent > 0.8: %.3f, percent < 0.1: %.3f', zEmbeddings[2]:max(), zEmbeddings[2]:min(), zEmbeddings[2][zEmbeddings[2]:gt(0.8)]:nElement()/zEmbeddings[2]:nElement(), zEmbeddings[2][zEmbeddings[2]:lt(0.1)]:nElement()/zEmbeddings[2]:nElement()))
-    zEmbeddings[2]:log()
 
 
     -- Save the errors into tensors -- to be used for plotting
