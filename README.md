@@ -1,7 +1,7 @@
 # Synthesizing 3D Shapes via Modeling Multi-View Depth Maps and Silhouettes with Deep Generative Networks
 This repository provides a Torch implementation of the framework proposed by Soltani *et. al.* in a paper titled [Synthesizing 3D Shapes via Modeling Multi-View Depth Maps and Silhouettes with Deep Generative Networks](http://openaccess.thecvf.com/content_cvpr_2017/papers/Soltani_Synthesizing_3D_Shapes_CVPR_2017_paper.pdf)
 
-Slided used for two invited talks at CVPR's Vision Meets Cognition Workshop and MIT's Vision Seminar (contains new results): [Here](https://www.amazon.com/clouddrive/share/LFi7roLO1TvchfKYAerFOCKqjXaBP8pURzR8AZNT7nm)
+Slides used for two invited talks at CVPR's Vision Meets Cognition Workshop and MIT's Vision Seminar (contains new results): [Here](https://www.amazon.com/clouddrive/share/LFi7roLO1TvchfKYAerFOCKqjXaBP8pURzR8AZNT7nm)
 
 # Requirements
 - [Torch](http://torch.ch/)
