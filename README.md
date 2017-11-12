@@ -74,7 +74,7 @@ Here are a few examples on how to train different models. The models will be tra
     th main.lua  -modelDirName "AllVPNet" -dropoutNet 0 -singleVPNet 0 -silhouetteInput 0 -conditional 0 -benchmark 1
 
 ## Testing:
-    To load a model and use it for testing (reconstruction, sampling etc) do the followings:
+To load a model and use it for testing (reconstruction, sampling etc) do the followings:
     Make sure you have stored the depth maps into tensors (`th main.lua -zip 1 -fromScratch 1 -maxMemory 3000 -train 0`)
     Download a pre-trained model and its corresponding `mean_logvar.t7` file from [here](https://www.amazon.com/clouddrive/share/oDnklSMldXWd3CrzSu5ndfl0GMIBffRfvMAFvkWkz5x)
     Set the optional arguments in accordance to the model downloaded
