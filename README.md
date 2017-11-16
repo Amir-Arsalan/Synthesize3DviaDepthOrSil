@@ -108,7 +108,11 @@ To generate the final 3D shape do the followings:
 ## Random Sampling
     th main.lua -modelDirName 'someModelDirName' -experiment 1 -expType 'randomSampling' -conditional 1 -sampleCategory 'chair, car, sofa, laptop, guitar, airplane'
 For conditional models you can specify which categories to get samples for by having comma-separated category names in the `sampleCategory` argument. Simply remove `sampleCategory` argument if you want to get samples for all categories.
+
+Here are some random samples:
 ![random](images/random.png "Random")
+
+And here are some conditional samples:
 ![conditional](images/conditional.png "Conditional")
 
 ## Nearest Neighbors
