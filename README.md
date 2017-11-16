@@ -153,10 +153,10 @@ Remove `-sampleCategory 'chair, car, sofa, laptop, guitar, airplane'` if you wan
 
 Here is the tSNE visualization for all of the ShapeNet Core training samples:
 
-<img src="images/tsne-all.png" width="800" height="800">
+<img src="images/tsne-single.png" width="800" height="800">
 
 Click
-[here](images/tsne-all.svg)
+[here](images/tsne-single.svg)
 to view it with the original resolution.
 
 
