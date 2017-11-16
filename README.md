@@ -3,6 +3,8 @@ This repository provides a Torch implementation of the framework proposed by Sol
 
 Slides used for two invited talks at CVPR's Vision Meets Cognition Workshop and MIT's Vision Seminar (contains new results): [Here](https://www.amazon.com/clouddrive/share/LFi7roLO1TvchfKYAerFOCKqjXaBP8pURzR8AZNT7nm)
 
+<p align="center"><img src="images/teaser.png" width="700"></p>
+
 # Requirements
 - [Torch](http://torch.ch/)
 - [nn](https://github.com/torch/nn)
@@ -40,6 +42,8 @@ Use `main.lua` to train new models or run experiments for a pre-trained model. B
 
 Setting both `dropoutNet` and `singleVPNet` to `0` means that you are working with a `AllVPNet` model.
 
+![architecture](images/architecture.png "Architecture")
+
 ## Data
 
 ### Using the pre-rendered data
@@ -49,6 +53,8 @@ You can download the pre-rendered data sets for [ShapNet Core](https://www.shape
     th main.lua -zip 1 -fromScratch 1 -maxMemory 3000 -train 0
 
 ### Rendering viewpoints
+![render](images/data.png "Render")
+
 If you want to create your own data set you can use the rendering code provided in `/depth_render_reconstruction/code/renderDepth/`. The obj/ply files names should be in `model_x` format where `x` could be any integer. You need to have install Microsoft Visual C++ 2013 Redistributable. After rendering view points to create your data set make sure you follow the following pattern for creating your .zip files:
 
     CategoryName.zip
@@ -102,8 +108,11 @@ To generate the final 3D shape do the followings:
 ## Random Sampling
     th main.lua -modelDirName 'someModelDirName' -experiment 1 -expType 'randomSampling' -conditional 1 -sampleCategory 'chair, car, sofa, laptop, guitar, airplane'
 For conditional models you can specify which categories to get samples for by having comma-separated category names in the `sampleCategory` argument. Simply remove `sampleCategory` argument if you want to get samples for all categories.
+![random](images/random.png "Random")
+![conditional](images/conditional.png "Conditional")
 
 ## Nearest Neighbors
+![nearest](images/nearest.png "Nearest")
 We show that our models do not memorize the training samples by showing the nearest neighbor examples (on the Z layer embeddings) from the test set. You can run the nearest neighbor experiment for both unconditional and conditional samples. You can download the samples selected manually (manual selection is done via viz.txt) from [here](https://www.amazon.com/clouddrive/share/PlS80OfnCWV6I27N6AwDmCG24kC8dHdiHTkQbteMrlf). To get the nearest neighbor samples:
     
     Make sure you have your selected samples here `/modelDirName/experiments/[conditionalSamples/randomSamples]-empirical/`
@@ -117,30 +126,34 @@ If you want to use the model trained on yoru machine, make sure you set the `fro
 
     Run the following to reconstruct all samples in the test data set:
     th main.lua -modelDirName 'someModelDirName' -experiment 1 -conditional 1 -expType 'forwardPass' -forwardPassType 'reconstructAllSamples'
-
-
-## Interpolation
-    th main.lua -modelDirName 'someModelDirName' -conditional 0 -experiment 1 -expType 'interpolation' -nSamples 3 -sampleCategory 'chair, car, sofa, laptop, guitar, airplane'
-Remove `-sampleCategory 'chair, car, sofa, laptop, guitar, airplane'` if you want to get interpolation for all categories
-
+![reconstruction](images/reconstruction.png "Reconstruction")
+    
 ## Out-of-sample generalization
 Make sure you extract the `zip-ExtraData.zip` into the repository directory before running the following commands. For `userData` the code will convert rgb images into silhouettes if`silhouetteInput` is set to `1`. If you set it to `0` the code will assume you only have depth maps in `/ExtraData/userData/` and are working with a model trained on depth maps.
 
 ### NYUD
     th main.lua -modelDirName 'someModelDirName' -experiment 1 -conditional 0 -expType 'forwardPass' -forwardPassType 'nyud'
+![generalization](images/generalization.png "NYUD")
 
 ### Random silhouettes/depth maps from user
     th main.lua -modelDirName 'someModelDirName' -experiment 1 -conditional 0 -silhouetteInput 0 -expType 'forwardPass' -forwardPassType 'userData'
 
+## Interpolation
+    th main.lua -modelDirName 'someModelDirName' -conditional 0 -experiment 1 -expType 'interpolation' -nSamples 3 -sampleCategory 'chair, car, sofa, laptop, guitar, airplane'
+Remove `-sampleCategory 'chair, car, sofa, laptop, guitar, airplane'` if you want to get interpolation for all categories
+
 ## tSNE Visualization
     Run the following command for applying the tSNE algorithm on the Z layer embeddings.
     th main.lua -modelDirName 'someModelDirName' -experiment 1 -conditional 0 -silhouetteInput 0 -expType 'tSNE''
+<img src="images/tsne-all.svg" width="800" height="800">
+Click on the image to view it with the original resolution.
 
 ## Representation Consistency
 `SingleVPNet` models give similar reconstructions/IoU/classification accuracy for most viewpoints, meaning that they obtain some consistent representations. You can run the representation consistency experiment on our `ShapeNet Core` test set by running the following command:
 
     th main.lua  -modelDirName "SingleVPNet-Conditional-Depth"  -silhouetteInput 0 -singleVPNet 1 -conditional 1 -benchmark 0 -experiment 1 -fromEpoch 0 -expType 'forwardPass' -forwardPassType 'reconstructAllSamples' -allViewsExp 1
     th main.lua  -modelDirName "SingleVPNet-Conditional-Silhouette"  -silhouetteInput 1 -singleVPNet 1 -conditional 1 -benchmark 0 -experiment 1 -fromEpoch 0 -expType 'forwardPass' -forwardPassType 'reconstructAllSamples' -allViewsExp 1
+![consistency](images/consistency.png "Consistency")
 
 ## IoU Computation
     To compute the IoU number for reconstructions do the following:
