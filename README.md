@@ -145,7 +145,11 @@ Remove `-sampleCategory 'chair, car, sofa, laptop, guitar, airplane'` if you wan
 ## tSNE Visualization
     Run the following command for applying the tSNE algorithm on the Z layer embeddings.
     th main.lua -modelDirName 'someModelDirName' -experiment 1 -conditional 0 -silhouetteInput 0 -expType 'tSNE''
+
+Here is the tSNE visualization for all of the ShapeNet Core training samples:
+
 <img src="images/tsne-all.png" width="800" height="800">
+
 Click
 [here](images/tsne-all.svg)
 to view it with the original resolution.
