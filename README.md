@@ -61,50 +61,55 @@ If you want to create your own data set you can use the rendering code provided 
 ## Training:
 Here are a few examples on how to train different models. The models will be trained on the ShapeNet core data set unless you set `benchmark` to `1`:
 
-    Train an unconditional `AllVPNet` model using depth maps:
+    Train an unconditional AllVPNet model using depth maps:
     th main.lua  -modelDirName "AllVPNet" -dropoutNet 0 -singleVPNet 0 -silhouetteInput 0 -conditional 0 -benchmark 0
     
     Train a conditional `DropoutNet` model using depth maps:
     th main.lua  -modelDirName "DropoutNet-Conditional" -dropoutNet 1 -singleVPNet 0 -silhouetteInput 0 -conditional 1 -benchmark 0
     
-    Train a conditional `SingleVPNet` using silhouettes:
+    Train a conditional SingleVPNet using silhouettes:
     th main.lua  -modelDirName "SingleVPNet-Cond" -dropoutNet 0 -singleVPNet 1 -silhouetteInput 1 -conditional 1 -benchmark 0
     
-    Train an unconditional `AllVPNet` model for `ModelNet40` data set with silhouettes:
+    Train an unconditional AllVPNet model for `ModelNet40` data set with silhouettes:
     th main.lua  -modelDirName "AllVPNet" -dropoutNet 0 -singleVPNet 0 -silhouetteInput 0 -conditional 0 -benchmark 1
+    
+    Make sure you set the testPhase argument to 0 when training or running experiments
 
 ## Testing:
-To load a model and use it for testing (reconstruction, sampling etc) do the followings:
-    Make sure you have stored the depth maps into tensors (`th main.lua -zip 1 -fromScratch 1 -maxMemory 3000 -train 0`)
-    Download a pre-trained model and its corresponding `mean_logvar.t7` file from [here](https://www.amazon.com/clouddrive/share/oDnklSMldXWd3CrzSu5ndfl0GMIBffRfvMAFvkWkz5x)
-    Set the optional arguments in accordance to the model downloaded
-    Copy `model.t7` and `mean_logvar.t7` to `modelDirName/model/[epochx]`
+To load a model and use it for testing (reconstruction, sampling etc) download a pre-trained model from [here](https://www.amazon.com/clouddrive/share/oDnklSMldXWd3CrzSu5ndfl0GMIBffRfvMAFvkWkz5x) and do the followings:
 
-Set `testPhase` to `1` for quick runs/tests Make sure you set `testPhase` to `0` when training or running experiments. Set `fromEpoch` to `80` if you are using the pre-trained models.
+    Make sure you have stored the depth maps into tensors (th main.lua -zip 1 -fromScratch 1 -maxMemory 3000 -train 0)
+    Set the optional arguments in accordance to the model downloaded
+    Copy model.t7 and mean_logvar.t7 to modelDirName/model/
+    th main.lua -modelDirName 'someModelDirName' -experiment 1 -expType 'randomSampling' -conditional 1 -sampleCategory 'chair, car, sofa, laptop, guitar, airplane'
+    expType could be either randomSampling, interpolation, forwardPass, NNs or tSNE
+    
+Optional:
+    
+    Set the testPhase argument to 1 for quick runs/tests
     
 ## Visualization in 3D (Point Cloud)
-    To generate the final 3D shape do the followings:
+To generate the final 3D shape do the followings:
+    
     Unzip `depth_render_reconstruction.zip`
-    Compile the code in `/depth_render_reconstruction/code/depthReconstruction_Ubuntu/depthReconstruction` (Make sure OpenCV is installed)
-    Copy the built executable file `depthReconstruction` and into the results directory; `camPosList.txt` must be present in the same directory.
-    Run the `4_1_visualization.lua -inputDir 'anywhereOnDisk' -outputDir 'anywhereOnDisk' -experiment 'sampling'`
-    The valid inputs for `experiment` are `reconstruction`, `sampling`, `interpolation` and `NN`. Use `reconstruction` for `nyud` and 'userData` experiments.
+    Compile the code in /depth_render_reconstruction/code/depthReconstruction_Ubuntu/depthReconstruction (Make sure OpenCV is installed)
+    Copy the built executable file `depthReconstruction` and into the results directory; camPosList.txt must be present in the same directory.
+    Run the 4_1_visualization.lua -inputDir 'anywhereOnDisk' -outputDir 'anywhereOnDisk' -experiment 'sampling'
+    The valid inputs for experiment are reconstruction, sampling, interpolation and `NN`. Use reconstruction for nyud and userData experiments.
 
 # Results
 
-## Samples
+## Random Sampling
     th main.lua -modelDirName 'someModelDirName' -experiment 1 -expType 'randomSampling' -conditional 1 -sampleCategory 'chair, car, sofa, laptop, guitar, airplane'
-For conditional models you can specify which categories to get samples for by having comma-separated category names in the `sampleCategory` argument. Simply remove `sampleCategory` argument if you want to get samples for all categories. Note that it's easier to obtain samples from `SingleVPNet`
+For conditional models you can specify which categories to get samples for by having comma-separated category names in the `sampleCategory` argument. Simply remove `sampleCategory` argument if you want to get samples for all categories.
 
 ## Nearest Neighbors
-We show that our models do not memorize the training samples by showing the nearest neighbor examples (on the Z embeddings)  from the test set. You can run the nearest neighbor experiment for both unconditional and conditional samples. If you are using one of the pre-trained models:
-
-    Download the samples selected manually (through a viz.txt) from [here](https://www.amazon.com/clouddrive/share/Pzq5nmFzEFPVT6jtOeoKQ1IHDc6N8r9u2ndLbt8gzG5?ref_=cd_ph_share_link_copy)
-    Unzip the .zip files and copy them to /modelDirName/experiments/
-    Copy the corresponding pre-trained model to `/modelDirName/model/`
+We show that our models do not memorize the training samples by showing the nearest neighbor examples (on the Z layer embeddings) from the test set. You can run the nearest neighbor experiment for both unconditional and conditional samples. You can download the samples selected manually (manual selection is done via viz.txt) from [here](https://www.amazon.com/clouddrive/share/PlS80OfnCWV6I27N6AwDmCG24kC8dHdiHTkQbteMrlf). To get the nearest neighbor samples:
+    
+    Make sure you have your selected samples here `/modelDirName/experiments/[conditionalSamples/randomSamples]-empirical/`
     `th main.lua  -modelDirName "AllVPNet-Conditional-Sil"  -silhouetteInput 1 -conditional 1 -benchmark 0 -experiment 1 -fromEpoch 0 -expType 'NNs'`
-
-    If you want to use your own model make sure you set the `fromEpoch` argument and create a viz.txt file in each sample set directory(e.g `.../randomSamples/sample1/` or `.../conditionalSamples/airplane/sample1/`) -- similar to the samples uploaded
+    
+If you want to use the model trained on yoru machine, make sure you set the `fromEpoch` argument and create a viz.txt file in each sample set directory(e.g `.../randomSamples-empirical/sample1/` or `.../conditionalSamples-empirical/airplane/sample1/`)
 
 
 ## Reconstruction
