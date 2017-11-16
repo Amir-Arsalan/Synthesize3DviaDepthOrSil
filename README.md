@@ -116,13 +116,14 @@ And here are some conditional samples:
 ![conditional](images/conditional.png "Conditional")
 
 ## Nearest Neighbors
-![nearest](images/nearest.png "Nearest")
 We show that our models do not memorize the training samples by showing the nearest neighbor examples (on the Z layer embeddings) from the test set. You can run the nearest neighbor experiment for both unconditional and conditional samples. You can download the samples selected manually (manual selection is done via viz.txt) from [here](https://www.amazon.com/clouddrive/share/PlS80OfnCWV6I27N6AwDmCG24kC8dHdiHTkQbteMrlf). To get the nearest neighbor samples:
     
     Make sure you have your selected samples here `/modelDirName/experiments/[conditionalSamples/randomSamples]-empirical/`
     `th main.lua  -modelDirName "AllVPNet-Conditional-Sil"  -silhouetteInput 1 -conditional 1 -benchmark 0 -experiment 1 -fromEpoch 0 -expType 'NNs'`
     
 If you want to use the model trained on yoru machine, make sure you set the `fromEpoch` argument and create a viz.txt file in each sample set directory(e.g `.../randomSamples-empirical/sample1/` or `.../conditionalSamples-empirical/airplane/sample1/`)
+
+![nearest](images/nearest.png "Nearest")
 
 
 ## Reconstruction
