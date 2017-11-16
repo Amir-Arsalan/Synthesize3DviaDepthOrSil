@@ -1,7 +1,7 @@
 # Synthesizing 3D Shapes via Modeling Multi-View Depth Maps and Silhouettes with Deep Generative Networks
 This repository provides a Torch implementation of the framework proposed by Soltani *et. al.* in a paper titled [Synthesizing 3D Shapes via Modeling Multi-View Depth Maps and Silhouettes with Deep Generative Networks](http://openaccess.thecvf.com/content_cvpr_2017/papers/Soltani_Synthesizing_3D_Shapes_CVPR_2017_paper.pdf)
 
-Slides used for two invited talks at CVPR's Vision Meets Cognition Workshop and MIT's Vision Seminar (contains new results): [Here](https://www.amazon.com/clouddrive/share/LFi7roLO1TvchfKYAerFOCKqjXaBP8pURzR8AZNT7nm)
+Slides used for two invited talks at CVPR's Vision Meets Cognition Workshop and MIT's Vision Seminar (contains new results): [Here](https://www.amazon.com/clouddrive/share/11ZawJt4UbRb0Sm7qlV3WQRPE1TFtDoLhXuYcDlPoCg)
 
 <p align="center"><img src="images/teaser.png" width="700"></p>
 
@@ -133,7 +133,7 @@ Make sure you extract the `zip-ExtraData.zip` into the repository directory befo
 
 ### NYUD
     th main.lua -modelDirName 'someModelDirName' -experiment 1 -conditional 0 -expType 'forwardPass' -forwardPassType 'nyud'
-![generalization](images/generalization.png "NYUD")
+<p align="center"><img src="images/generalization.png" width="600"></p>
 
 ### Random silhouettes/depth maps from user
     th main.lua -modelDirName 'someModelDirName' -experiment 1 -conditional 0 -silhouetteInput 0 -expType 'forwardPass' -forwardPassType 'userData'
@@ -145,8 +145,11 @@ Remove `-sampleCategory 'chair, car, sofa, laptop, guitar, airplane'` if you wan
 ## tSNE Visualization
     Run the following command for applying the tSNE algorithm on the Z layer embeddings.
     th main.lua -modelDirName 'someModelDirName' -experiment 1 -conditional 0 -silhouetteInput 0 -expType 'tSNE''
-<img src="images/tsne-all.svg" width="800" height="800">
-Click on the image to view it with the original resolution.
+<img src="images/tsne-all.png" width="800" height="800">
+Click
+[here](images/tsne-all.svg)
+to view it with the original resolution.
+
 
 ## Representation Consistency
 `SingleVPNet` models give similar reconstructions/IoU/classification accuracy for most viewpoints, meaning that they obtain some consistent representations. You can run the representation consistency experiment on our `ShapeNet Core` test set by running the following command:
