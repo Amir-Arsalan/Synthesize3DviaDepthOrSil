@@ -181,9 +181,9 @@ to view it with the original resolution.
 Please cite our work if you found our paper helpful and/or use our code for your research:
 
 ```
-@article{3DVAE,
+@inproceedings{{3DVAE,
   title={Synthesizing 3D Shapes via Modeling Multi-View Depth Maps and Silhouettes with Deep Generative Networks},
-  author={Soltani, Amir Arsalan and Huang, Haibin and Wu, Jiajun and Kulkarni, Tejas and Tenenbaum, Joshua},
+  author={Soltani, Amir Arsalan and Huang, Haibin and Wu, Jiajun and Kulkarni, Tejas D and Tenenbaum, Joshua B}
   booktitle={Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition},
   pages={1511-1519},
   year={2017}
