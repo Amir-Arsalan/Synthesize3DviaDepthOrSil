@@ -114,7 +114,7 @@ For conditional models you can specify which categories to get samples for by ha
 Here are some random samples:
 ![random](images/random.png "Random")
 
-And here are some conditional samples:
+And here are some conditional samples. The models are able to quickly learn the generative distribution for a new category through hierarchical priors and using the learned representations for other categories. For instance, we only had about 50 samples of headphones in the training set but the model generates good-looking samples of headphones after training:
 ![conditional](images/conditional.png "Conditional")
 
 ## Nearest Neighbors
