@@ -49,7 +49,7 @@ Setting both `dropoutNet` and `singleVPNet` to `0` means that you are working wi
 ## Data
 
 ### Using the pre-rendered data
-You can download the pre-rendered data sets for [ShapNet Core](https://www.shapenet.org/) from [here](https://www.amazon.com/clouddrive/share/oDnklSMldXWd3CrzSu5ndfl0GMIBffRfvMAFvkWkz5x). You will need about ~30GBs and ~8GBs for the .zip files for `ShapeNet Core` and `ModelNet40` data sets respectively. The data sets only contain raw depth map rendering results in float or int (stored in png files). To process the data sets and store the viewpoint depth maps into `Torch` tensors you  would need an additional ~160GBs and ~55GBs for each `ShapeNet Core` or `ModelNet40` respectively. Set the `benchmark` argument to 0 or 1 to use the ShapeNet core or ModelNet40 data sets respectively.
+You can download the pre-rendered data sets for [ShapNet Core](https://www.shapenet.org/) and [ModelNet 40](http://3dshapenets.cs.princeton.edu/) from [here](https://www.amazon.com/clouddrive/share/XRQcedcwFPQlAjaIBKt3UskksFDyIi9iEC6tjS9ICBk). You will need about ~30GBs and ~8GBs for the .zip files for `ShapeNet Core` and `ModelNet40` data sets respectively. The data sets only contain raw depth map rendering results in float or int (stored in png files). To process the data sets and store the viewpoint depth maps into `Torch` tensors you  would need an additional ~160GBs and ~55GBs for each `ShapeNet Core` or `ModelNet40` respectively. Set the `benchmark` argument to 0 or 1 to use the ShapeNet core or ModelNet40 data sets respectively.
 
     Run the following command to store the rendered 2D images of depth maps into Torch tensors:
     th main.lua -zip 1 -fromScratch 1 -maxMemory 3000 -train 0
@@ -94,7 +94,7 @@ To load a model and use it for testing (reconstruction, sampling etc) download a
     
 Optional:
     
-    Set the testPhase argument to 1 for quick runs/tests
+    Set the testPhase argument to 1 to only use the test set for quick runs/tests
     
 ## Visualization in 3D (Point Cloud)
 To generate the final 3D shape do the followings:
@@ -170,12 +170,15 @@ to view it with the original resolution.
 ![consistency](images/consistency.png "Consistency")
 
 ## IoU Computation
-    To compute the IoU number for reconstructions do the following:
-    `th main.lua -modelDirName 'someModelDirName' -experiment 1 -expType 'forwardPass' -forwardPassType 'reconstructAllSamples'`
-    To get IoU numbers for each viewpoint run `th main.lua -experiment 1 -expType 'forwardPass' -forwardPassType 'reconstructAllSamples' -allViewsExp` instead.
-    On a Windows machine, open the `README.txt` in `zip-IoU.zip` and install the requirements
-    Unzip the `zip.IoU.zip`
-    Run `run.bat`
+Execute the following to get the reconstructions for all test samples:
+
+    th main.lua -modelDirName 'someModelDirName' -experiment 1 -expType 'forwardPass' -forwardPassType 'reconstructAllSamples'`
+    
+For a `SingleVPNet` model execute the following to get reconstructions for each views separately:
+
+    th main.lua -experiment 1 -expType 'forwardPass' -forwardPassType 'reconstructAllSamples' -allViewsExp 1`
+    
+To get the IoU numbers, in a Windows machine open the `README.txt` in `zip-IoU.zip` and install the requirements. Then Run `run.bat`
 
 
 # Citation
