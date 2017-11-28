@@ -44,7 +44,7 @@ Use `main.lua` to train new models or run experiments for a pre-trained model. B
 
 Setting both `dropoutNet` and `singleVPNet` to `0` means that you are working with a `AllVPNet` model.
 
-![architecture](images/architecture.png "Architecture")
+![architecture](images/arch.png "Architecture")
 
 ## Data
 
