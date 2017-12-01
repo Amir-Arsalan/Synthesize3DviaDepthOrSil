@@ -38,7 +38,7 @@ Use `main.lua` to train new models or run experiments for a pre-trained model. B
 - `singleVPNet`: Set to `1` to trainor or use a pre-trained `SingleVPNet` model 
 - `conditional`: Set to `1` for conditional models
 - `silhouetteInput`: Set to `1` to use silhouettes for training/testing
-- `KLD`: The KLD term's gradient coefficient
+- `KLD`: The KLD term's gradient coefficient (smaller values like 10 delivers better reconstructions after training)
 - `experiment`: Set to `0` when you want to train a model and to `1` when you want to use a pre-trained model
 - `fromEpoch`: Set to the epoch number from which you want to load a model and use it for testing (use when `experiment` is set to `1`). Set to `0` to use one of the pre-trained models (download from [here](https://www.amazon.com/clouddrive/share/ar4GuXPAPtUBb4NRbjjbrzNB3BLL2On5nD4jYhFbdTi?ref_=cd_ph_share_link_copy))
 
@@ -51,7 +51,8 @@ Setting both `dropoutNet` and `singleVPNet` to `0` means that you are working wi
 ### Using the pre-rendered data
 You can download the pre-rendered data sets for [ShapNet Core](https://www.shapenet.org/) and [ModelNet 40](http://3dshapenets.cs.princeton.edu/) from [here](https://www.amazon.com/clouddrive/share/XRQcedcwFPQlAjaIBKt3UskksFDyIi9iEC6tjS9ICBk). You will need about ~30GBs and ~8GBs for the .zip files for `ShapeNet Core` and `ModelNet40` data sets respectively. The data sets only contain raw depth map rendering results in float or int (stored in png files). To process the data sets and store the viewpoint depth maps into `Torch` tensors you  would need an additional ~160GBs and ~55GBs for each `ShapeNet Core` or `ModelNet40` respectively. Set the `benchmark` argument to 0 or 1 to use the ShapeNet core or ModelNet40 data sets respectively.
 
-    Run the following command to store the rendered 2D images of depth maps into Torch tensors:
+Run the following command to store the rendered 2D images of depth maps into Torch tensors:
+
     th main.lua -zip 1 -fromScratch 1 -maxMemory 3000 -train 0
 
 ### Rendering viewpoints
@@ -81,7 +82,7 @@ Here are a few examples on how to train different models. The models will be tra
     Train an unconditional AllVPNet model for `ModelNet40` data set with silhouettes:
     th main.lua  -modelDirName "AllVPNet" -dropoutNet 0 -singleVPNet 0 -silhouetteInput 0 -conditional 0 -benchmark 1
     
-    Make sure you set the testPhase argument to 0 when training or running experiments
+Make sure you set the `testPhase` argument to `0` when training or running experiments
 
 ## Testing:
 To load a model and use it for testing (reconstruction, sampling etc) download a pre-trained model from [here](https://www.amazon.com/clouddrive/share/oDnklSMldXWd3CrzSu5ndfl0GMIBffRfvMAFvkWkz5x) and do the followings:
@@ -111,7 +112,7 @@ To generate the final 3D shape do the followings:
     th main.lua -modelDirName 'someModelDirName' -experiment 1 -expType 'randomSampling' -conditional 1 -sampleCategory 'chair, car, sofa, laptop, guitar, airplane'
 For conditional models you can specify which categories to get samples for by having comma-separated category names in the `sampleCategory` argument. Simply remove `sampleCategory` argument if you want to get samples for all categories.
 
-Here are some random samples:
+Here are some random samples obtained from unconditionally-trained models:
 ![random](images/random.png "Random")
 
 And here are some conditional samples. The models are able to quickly learn the generative distribution for a new category through hierarchical priors and using the learned representations for other categories. For instance, we only had about 50 samples of headphones in the training set but the model generates good-looking samples of headphones after training:
@@ -131,7 +132,8 @@ If you want to use the model trained on yoru machine, make sure you set the `fro
 ## Reconstruction
     th main.lua -modelDirName 'someModelDirName' -experiment 1 -conditional 0 -expType 'forwardPass' -forwardPassType 'randomReconstruction' -nReconstructions 80
 
-    Run the following to reconstruct all samples in the test data set:
+Run the following to reconstruct all samples in the test data set:
+
     th main.lua -modelDirName 'someModelDirName' -experiment 1 -conditional 1 -expType 'forwardPass' -forwardPassType 'reconstructAllSamples'
 ![reconstruction](images/reconstruction.png "Reconstruction")
     
@@ -147,10 +149,11 @@ Make sure you extract the `zip-ExtraData.zip` into the repository directory befo
 
 ## Interpolation
     th main.lua -modelDirName 'someModelDirName' -conditional 0 -experiment 1 -expType 'interpolation' -nSamples 3 -sampleCategory 'chair, car, sofa, laptop, guitar, airplane'
-Remove `-sampleCategory 'chair, car, sofa, laptop, guitar, airplane'` if you want to get interpolation for all categories
+Remove `-sampleCategory 'chair, car, sofa, laptop, guitar, airplane'` if you want to get interpolation results for all categories
 
 ## tSNE Visualization
-    Run the following command for applying the tSNE algorithm on the Z layer embeddings.
+Run the following command for applying the tSNE algorithm on the Z layer embeddings.
+
     th main.lua -modelDirName 'someModelDirName' -experiment 1 -conditional 0 -silhouetteInput 0 -expType 'tSNE''
 
 Here is the tSNE visualization for all of the ShapeNet Core training samples:
