@@ -20,6 +20,37 @@ CVPR 2017 Poster: [Here](images/poster.pdf)
 - [xlua](https://github.com/torch/xlua) -- Needed only when processing/preparing your own data set throught `1_dataLoader.lua`
 - [OpenCV](http://docs.opencv.org/2.4/doc/tutorials/introduction/linux_install/linux_install.html) -- for final 3D-model reconstruction and visualization
 
+## Installing [Torch](http://torch.ch/)
+
+<!-- Torch installation has been obtained from https://github.com/facebookresearch/wav2letter -->
+
+### 1- Install LuaJIT and LuaRocks
+
+The following installs luaJIT and luarocks locally in `$HOME/usr`. If you
+want a system-wide installation, remove the
+`-DCMAKE_INSTALL_PREFIX=$HOME/usr` option.
+
+```sh
+git clone https://github.com/torch/luajit-rocks.git
+cd luajit-rocks
+mkdir build; cd build
+cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/usr -DWITH_LUAJIT21=OFF
+make -j 4
+make install
+cd ../..
+```
+
+We assume `luarocks` and `luajit` are in `$PATH`. If
+they are not - and assuming you installed them locally in `$HOME/usr` - you
+can instead run `~/usr/bin/luarocks` and `~/usr/bin/luajit`.
+
+### 2- Installing Torch and other Torch packages
+```sh
+luarocks install torch
+luarocks install cudnn # for GPU support
+luarocks install cunn # for GPU support
+```
+
 ## Optional Requirements
 - [tSNE](https://github.com/DmitryUlyanov/Multicore-TSNE) -- For running the tSNE experiment
 - [cudnn v5.1 or higher](https://developer.nvidia.com/cudnn)
