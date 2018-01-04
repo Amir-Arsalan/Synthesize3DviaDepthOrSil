@@ -98,7 +98,7 @@ If you want to create your own data set you can use the rendering code provided 
         ├── ...
         └── model_x_Cam_19.jpg
         
-Note that the file `camPosList.txt` contains the `x`, `y` and `z` coordinates for `20` camera positions that we used.
+Note that the file `camPosList.txt` contains the `x`, `y` and `z` coordinates for `20` camera positions that we used. In case you want to compile the rendering pipeline and not use the provided `.exe` file for rendering views, you may compile [this code ](https://github.com/brotherhuang/funCode/blob/master/renderDepth.cpp). You may also compile a newer version of the same code provided ![here](renderDepth_new.zip "render new").
 
 ## Training:
 Here are a few examples on how to train different models. The models will be trained on the ShapeNet core data set unless you set `benchmark` to `1`:
