@@ -20,6 +20,10 @@ CVPR 2017 Poster: [Here](images/poster.pdf)
 - [xlua](https://github.com/torch/xlua) -- Needed only when processing/preparing your own data set throught `1_dataLoader.lua`
 - [OpenCV](http://docs.opencv.org/2.4/doc/tutorials/introduction/linux_install/linux_install.html) -- for final 3D-model reconstruction and visualization
 
+## Optional Requirements
+- [tSNE](https://github.com/DmitryUlyanov/Multicore-TSNE) -- For running the tSNE experiment
+- [cudnn v5.1 or higher](https://developer.nvidia.com/cudnn)
+
 ## Installing [Torch](http://torch.ch/)
 
 <!-- Torch installation has been obtained from https://github.com/facebookresearch/wav2letter -->
@@ -50,10 +54,6 @@ luarocks install torch
 luarocks install cudnn # for GPU support
 luarocks install cunn # for GPU support
 ```
-
-## Optional Requirements
-- [tSNE](https://github.com/DmitryUlyanov/Multicore-TSNE) -- For running the tSNE experiment
-- [cudnn v5.1 or higher](https://developer.nvidia.com/cudnn)
 
 ## Hardware Requirements
 We recommend using a machine with ~200GBs of free storage (~60GBs if you're using [ModelNet40](http://3dshapenets.cs.princeton.edu/)), ~10GBs of memory and a GPU with ~5GBs of memory with the default arguments. You will need less than 2GBs of free GPU memory when using the model for running experiments (`4_0_runExps.lua`). GPU memory and RAM requirement could be reduced by setting `nCh` and `maxMemory` arguments to a smaller values respectively.
@@ -97,6 +97,8 @@ If you want to create your own data set you can use the rendering code provided 
         ├── model_x_Cam_0.jpg
         ├── ...
         └── model_x_Cam_19.jpg
+        
+Note that the file `camPosList.txt` contains the `x`, `y` and `z` coordinates for `20` camera positions that we used.
 
 ## Training:
 Here are a few examples on how to train different models. The models will be trained on the ShapeNet core data set unless you set `benchmark` to `1`:
