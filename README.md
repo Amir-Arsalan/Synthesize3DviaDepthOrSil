@@ -22,7 +22,7 @@ CVPR 2017 Poster: [Here](images/poster.pdf)
 
 ## Optional Requirements
 - [tSNE](https://github.com/DmitryUlyanov/Multicore-TSNE) -- For running the tSNE experiment
-- [cudnn v5.1 or higher](https://developer.nvidia.com/cudnn)
+- [cudnn v6 or higher](https://github.com/soumith/cudnn.torch/tree/R7) -- `git clone https://github.com/soumith/cudnn.torch.git -b R7 && cd cudnn.torch && luarocks make cudnn-scm-1.rockspec`
 
 ## Installing [Torch](http://torch.ch/)
 
