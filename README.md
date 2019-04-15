@@ -71,7 +71,7 @@ Use `main.lua` to train new models or run experiments for a pre-trained model. B
 - `silhouetteInput`: Set to `1` to use silhouettes for training/testing
 - `KLD`: The KLD term's gradient coefficient (smaller values like 10 delivers better reconstructions after training)
 - `experiment`: Set to `0` when you want to train a model and to `1` when you want to use a pre-trained model
-- `fromEpoch`: Set to the epoch number from which you want to load a model and use it for testing (use when `experiment` is set to `1`). Set to `0` to use one of the pre-trained models (download from [here](https://www.amazon.com/clouddrive/share/ar4GuXPAPtUBb4NRbjjbrzNB3BLL2On5nD4jYhFbdTi?ref_=cd_ph_share_link_copy))
+- `fromEpoch`: Set to the epoch number from which you want to load a model and use it for testing (use when `experiment` is set to `1`). Set to `0` to use one of the pre-trained models (download from [here](https://www.amazon.com/clouddrive/share/mVjIy6W9Arlp21FstJYDf5StXk3zeFIzPKFeawW6FPV))
 
 Setting both `dropoutNet` and `singleVPNet` to `0` means that you are working with a `AllVPNet` model.
 
