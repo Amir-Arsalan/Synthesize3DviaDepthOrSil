@@ -48,6 +48,8 @@ We assume `luarocks` and `luajit` are in `$PATH`. If
 they are not - and assuming you installed them locally in `$HOME/usr` - you
 can instead run `~/usr/bin/luarocks` and `~/usr/bin/luajit`.
 
+If you run into compilation issues or you are willing to use CUDA version 9.1 and higher, you may try using [this](https://github.com/nagadomi/distro) Git repo to compile Torch7.
+
 ### 2- Installing Torch and other Torch packages
 ```sh
 luarocks install torch
@@ -86,7 +88,7 @@ Run the following command to store the rendered 2D images of depth maps into Tor
 
     th main.lua -zip 1 -fromScratch 1 -maxMemory 3000 -train 0
 
-### Rendering viewpoints
+### Rendering Viewpoints
 ![render](images/data.png "Render")
 
 If you want to create your own data set you can use the rendering code provided in `/depth_render_reconstruction/code/renderDepth/`. The obj/ply files names should be in `model_x` format where `x` could be any integer. You need to have install Microsoft Visual C++ 2013 Redistributable. After rendering view points to create your data set make sure you follow the following pattern for creating your .zip files:
