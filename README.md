@@ -48,7 +48,14 @@ We assume `luarocks` and `luajit` are in `$PATH`. If
 they are not - and assuming you installed them locally in `$HOME/usr` - you
 can instead run `~/usr/bin/luarocks` and `~/usr/bin/luajit`.
 
-If you run into compilation issues or you are willing to use CUDA version 9.1 and higher, you may try using [this](https://github.com/nagadomi/distro) Git repo to compile Torch7.
+If you run into compilation issues or you are willing to use CUDA version 9.1 and higher, you may try using [this](https://github.com/nagadomi/distro) Git repo to compile Torch7 as follow:
+
+```sh
+git clone https://github.com/nagadomi/distro.git ~/torch --recursive
+cd ~/torch
+./install-deps
+./install.sh
+```
 
 ### 2- Installing Torch and other Torch packages
 ```sh
